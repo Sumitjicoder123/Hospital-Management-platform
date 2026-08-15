@@ -1,0 +1,55 @@
+package com.hospital.platform.config;
+
+import com.hospital.platform.entity.User;
+import com.hospital.platform.repository.UserRepository;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.Collections;
+
+@Component
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private final JwtUtils jwtUtils;
+    private final UserRepository userRepository;
+
+    public JwtAuthenticationFilter(JwtUtils jwtUtils, UserRepository userRepository) {
+        this.jwtUtils = jwtUtils;
+        this.userRepository = userRepository;
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+
+        String path = request.getRequestURI();
+        if (path.startsWith("/api/auth/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            if (jwtUtils.validateToken(token)) {
+                String email = jwtUtils.getEmailFromToken(token);
+                userRepository.findByEmail(email).ifPresent(user -> {
+                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                            user, null, Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
+                    );
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                });
+            }
+        }
+        
+        filterChain.doFilter(request, response);
+    }
+}

@@ -1,0 +1,698 @@
+<div class="app-shell">
+
+  <!-- Toast Notification -->
+  @if (notificationAlert) {
+    <div class="toast-bar">
+      <span class="toast-indicator"></span>
+      <span>{{ notificationAlert }}</span>
+    </div>
+  }
+
+  <!-- Top Navigation Bar -->
+  <header class="top-bar">
+    <div class="brand-block">
+      <div class="brand-mark">CP</div>
+      <div>
+        <h1 class="brand-name">City Care Pulse</h1>
+        <p class="brand-tagline">Hospital Resource &amp; Patient Flow Coordination</p>
+      </div>
+    </div>
+
+    <div class="facility-picker">
+      <label>Active Facility</label>
+      <select [ngModel]="selectedHospitalId" (ngModelChange)="onHospitalSelect($event)">
+        @for (h of hospitals; track h.id) {
+          <option [value]="h.id">{{ h.name }} &mdash; ICU {{ h.availableIcuBeds }}/{{ h.totalIcuBeds }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="header-right">
+      @if (userRole === 'HOSPITAL_ADMIN' || userRole === 'CITY_ADMIN') {
+        <button class="action-btn simulator" (click)="openWhatIfModal()">Surge Simulator</button>
+      }
+      <div class="user-badge">
+        <span class="user-name">{{ currentUser?.name }}</span>
+        <span class="role-pill">{{ roleBadge }}</span>
+      </div>
+      <button class="action-btn logout-btn" (click)="logout()">Sign Out</button>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="content-area">
+
+    <!-- PATIENT PORTAL -->
+    @if (userRole === 'PATIENT') {
+      @if (patientView !== 'DASHBOARD') {
+        <button class="btn-secondary" style="margin-bottom: 20px;" (click)="patientView = 'DASHBOARD'">← Back to Dashboard</button>
+      }
+
+      @if (patientView === 'DASHBOARD') {
+        <section class="panel full-panel">
+          <div class="panel-header">
+            <h2>Patient Dashboard</h2>
+            <p class="subtitle">Access hospital facilities and manage your healthcare</p>
+          </div>
+          <div class="panel-body">
+            <div class="facility-grid">
+              <div class="facility-card" style="cursor: pointer" (click)="patientView = 'APPOINTMENT'">
+                <div class="fac-name">Book Appointment</div>
+                <div class="fac-address">Schedule an in-person visit with our doctors</div>
+              </div>
+              <div class="facility-card" style="cursor: pointer" (click)="patientView = 'VIRTUAL'">
+                <div class="fac-name">Virtual Consultation</div>
+                <div class="fac-address">Connect with specialists online</div>
+              </div>
+              <div class="facility-card" style="cursor: pointer" (click)="patientView = 'VISITS'">
+                <div class="fac-name">Previous Visits</div>
+                <div class="fac-address">View your medical history and prescriptions</div>
+              </div>
+              <div class="facility-card" style="cursor: pointer" (click)="patientView = 'BEDS'">
+                <div class="fac-name">Available Beds</div>
+                <div class="fac-address">Check real-time bed availability</div>
+              </div>
+              <div class="facility-card" style="cursor: pointer" (click)="patientView = 'DEPARTMENTS'">
+                <div class="fac-name">Available Departments</div>
+                <div class="fac-address">Explore our specialized care departments</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      }
+
+      @if (patientView === 'APPOINTMENT') {
+        <div class="split-layout">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Book OPD Appointment</h2>
+              <p class="subtitle">Select department and doctor to receive a digital queue token</p>
+            </div>
+            <div class="panel-body">
+              <div class="field">
+                <label>Patient Name</label>
+                <input type="text" [(ngModel)]="bookingForm.patientName" disabled>
+              </div>
+              <div class="field">
+                <label>Phone</label>
+                <input type="text" [(ngModel)]="bookingForm.patientPhone" disabled>
+              </div>
+              <div class="field">
+                <label>Hospital</label>
+                <select [ngModel]="selectedHospitalId" (ngModelChange)="onHospitalSelect($event)">
+                  @for (h of hospitals; track h.id) {
+                    <option [value]="h.id">{{ h.name }}</option>
+                  }
+                </select>
+              </div>
+              <div class="field">
+                <label>Department</label>
+                <select [(ngModel)]="bookingForm.departmentId" (change)="onDepartmentChange()">
+                  @for (d of departments; track d.id) {
+                    <option [value]="d.id">{{ d.name }} ({{ d.code }})</option>
+                  }
+                </select>
+              </div>
+              <div class="field">
+                <label>Doctor</label>
+                <select [(ngModel)]="bookingForm.doctorId">
+                  @for (doc of doctors; track doc.id) {
+                    <option [value]="doc.id">Dr. {{ doc.name }} &mdash; {{ doc.specialization }}</option>
+                  }
+                </select>
+              </div>
+              <div class="field">
+                <label>Triage Priority</label>
+                <select [(ngModel)]="bookingForm.priority">
+                  <option value="ROUTINE">Routine</option>
+                  <option value="NORMAL">Normal</option>
+                  <option value="HIGH">High</option>
+                  <option value="CRITICAL">Critical</option>
+                  <option value="EMERGENCY">Emergency</option>
+                </select>
+              </div>
+              <button class="btn-primary full-width" (click)="submitBooking()">Generate Token</button>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>My Queue Tokens</h2>
+            </div>
+            <div class="panel-body">
+              @for (token of patientTokens; track token.id) {
+                <div class="token-card" style="margin-bottom: 16px;">
+                  <div class="token-id">{{ token.tokenNumber }}</div>
+                  <div class="token-meta-row">
+                    <span class="tag tag-status">{{ token.status }}</span>
+                    <span class="tag tag-priority">{{ token.priority }}</span>
+                  </div>
+                  @if (token.status === 'WAITING' || token.status === 'CALLED') {
+                    <div class="wait-display">
+                      <span class="wait-number">{{ token.estimatedWaitMinutes }}</span>
+                      <span class="wait-unit">min estimated wait</span>
+                    </div>
+                  }
+                  <dl class="token-details">
+                    <dt>Patient</dt><dd>{{ token.patientName }}</dd>
+                    <dt>Hospital</dt><dd>{{ token.hospitalId }}</dd>
+                  </dl>
+                </div>
+              }
+              @if (patientTokens.length === 0) {
+                <div class="empty-state">
+                  <p class="empty-title">No active token</p>
+                  <p class="empty-desc">Use the booking form to generate a queue token.</p>
+                </div>
+              }
+            </div>
+          </section>
+        </div>
+      }
+
+      @if (patientView === 'VIRTUAL') {
+        <section class="panel full-panel">
+          <div class="panel-header">
+            <h2>Virtual Consultation</h2>
+          </div>
+          <div class="panel-body">
+            <div class="empty-state">
+              <p class="empty-title">Coming Soon</p>
+              <p class="empty-desc">Virtual consultation API integration is currently in development.</p>
+            </div>
+          </div>
+        </section>
+      }
+
+      @if (patientView === 'VISITS') {
+        <section class="panel full-panel">
+          <div class="panel-header">
+            <h2>Previous Visits</h2>
+          </div>
+          <div class="panel-body">
+            @for (rec of patientHistoryRecords; track rec.id) {
+              <div style="background: #f8fafc; border: 1px solid var(--border-color); padding: 16px; border-radius: 8px; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                  <div>
+                    <strong>Date:</strong> {{ rec.createdAt | date:'medium' }}
+                  </div>
+                  <div>
+                    <strong>Doctor:</strong> Dr. {{ rec.doctorName }}
+                  </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.85rem; color: var(--text-secondary);">
+                  <div><strong>Vitals:</strong> BP: {{ rec.bloodPressure || 'N/A' }}, Temp: {{ rec.temperatureCelsius || 'N/A' }}°C, Pulse: {{ rec.pulseRate || 'N/A' }}, Weight: {{ rec.weightKg || 'N/A' }}kg</div>
+                  <div><strong>Symptoms:</strong> {{ rec.symptoms }}</div>
+                  <div style="grid-column: 1 / -1;"><strong>Diagnosis:</strong> <span style="color: var(--text-primary);">{{ rec.diagnosis }}</span></div>
+                  <div style="grid-column: 1 / -1;"><strong>Prescription:</strong> <span style="color: var(--text-primary);">{{ rec.prescription }}</span></div>
+                </div>
+              </div>
+            }
+            @if (patientHistoryRecords.length === 0) {
+              <div class="empty-state">
+                <p class="empty-title">No Previous Visits</p>
+                <p class="empty-desc">You do not have any past consultations on record.</p>
+              </div>
+            }
+          </div>
+        </section>
+      }
+
+      @if (patientView === 'BEDS') {
+        <section class="panel full-panel">
+          <div class="panel-header">
+            <h2>Available Beds</h2>
+          </div>
+          <div class="panel-body">
+             <div class="kpi-row">
+                <div class="kpi-card">
+                  <span class="kpi-value">{{ selectedHospital?.availableBeds || 0 }}</span>
+                  <span class="kpi-label">General Beds</span>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-value">{{ selectedHospital?.availableIcuBeds || 0 }}</span>
+                  <span class="kpi-label">ICU Beds</span>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-value">{{ selectedHospital?.availableEmergencyBeds || 0 }}</span>
+                  <span class="kpi-label">Emergency Beds</span>
+                </div>
+             </div>
+          </div>
+        </section>
+      }
+
+      @if (patientView === 'DEPARTMENTS') {
+        <section class="panel full-panel">
+          <div class="panel-header">
+            <h2>Available Departments</h2>
+          </div>
+          <div class="panel-body">
+            <div class="facility-grid">
+              @for (d of departments; track d.id) {
+                <div class="facility-card">
+                  <div class="fac-name">{{ d.name }}</div>
+                  <div class="fac-address">Code: {{ d.code }}</div>
+                </div>
+              }
+              @if (departments.length === 0) {
+                 <div class="empty-state" style="grid-column: 1 / -1">
+                  <p class="empty-title">No Departments Available</p>
+                 </div>
+              }
+            </div>
+          </div>
+        </section>
+      }
+    }
+
+    <!-- DOCTOR WORKSTATION -->
+    @if (userRole === 'DOCTOR') {
+      <section class="panel full-panel">
+        <div class="panel-header row-between">
+          <div>
+            <h2>OPD Queue Management</h2>
+            <p class="subtitle">Call patients, manage consultations, and initiate transfers</p>
+          </div>
+          <div class="doctor-info">
+            {{ currentUser?.name }} &middot; {{ queue.length }} in queue
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Token</th>
+                  <th>Patient</th>
+                  <th>Priority</th>
+                  <th>Arrival</th>
+                  <th>Status</th>
+                  <th>Est. Wait</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of queue; track item.id) {
+                  <tr [class.row-active]="item.status === 'IN_CONSULTATION'">
+                    <td class="cell-token">{{ item.tokenNumber }}</td>
+                    <td>{{ item.patientName }}</td>
+                    <td><span class="tag" [class.tag-critical]="item.priority === 'EMERGENCY' || item.priority === 'CRITICAL'" [class.tag-warn]="item.priority === 'HIGH'" [class.tag-ok]="item.priority === 'NORMAL' || item.priority === 'ROUTINE'">{{ item.priority }}</span></td>
+                    <td>{{ item.arrivalTime | date:'shortTime' }}</td>
+                    <td><span class="status-chip" [ngClass]="getStatusClass(item.status)">{{ item.status }}</span></td>
+                    <td>{{ item.estimatedWaitMinutes }} min</td>
+                    <td class="cell-actions">
+                      <button class="btn-sm btn-secondary" (click)="openPatientHistory(item)">History</button>
+                      @if (item.status === 'WAITING') {
+                        <button class="btn-sm btn-call" (click)="updateQueueStatus(item.id, 'IN_CONSULTATION')">Call</button>
+                      }
+                      @if (item.status === 'IN_CONSULTATION') {
+                        <button class="btn-sm btn-done" (click)="openCompleteConsultation(item)">Complete</button>
+                        <button class="btn-sm btn-secondary" (click)="openAdmitModal(item)">Admit</button>
+                        <button class="btn-sm btn-danger" (click)="triggerTransferModal(item)">Request ICU Transfer</button>
+                      }
+                    </td>
+                  </tr>
+                }
+                @if (queue.length === 0) {
+                  <tr><td colspan="7" class="empty-cell">No patients in queue</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    }
+
+    <!-- HOSPITAL ADMIN -->
+    @if (userRole === 'HOSPITAL_ADMIN') {
+      <div class="admin-layout">
+        <section class="panel full-panel">
+          <div class="panel-header">
+            <h2>{{ selectedHospital?.name }} &mdash; Capacity Overview</h2>
+          </div>
+          <div class="panel-body">
+            <div class="kpi-row">
+              <div class="kpi-card">
+                <span class="kpi-value">{{ selectedHospital?.availableBeds }}<small>/{{ selectedHospital?.totalBeds }}</small></span>
+                <span class="kpi-label">General Beds</span>
+              </div>
+              <div class="kpi-card kpi-warn">
+                <span class="kpi-value">{{ selectedHospital?.availableIcuBeds }}<small>/{{ selectedHospital?.totalIcuBeds }}</small></span>
+                <span class="kpi-label">ICU Beds</span>
+              </div>
+              <div class="kpi-card">
+                <span class="kpi-value">{{ selectedHospital?.availableEmergencyBeds }}<small>/{{ selectedHospital?.totalEmergencyBeds }}</small></span>
+                <span class="kpi-label">Emergency Beds</span>
+              </div>
+              <div class="kpi-card">
+                <span class="kpi-value">{{ waitingQueueCount }}</span>
+                <span class="kpi-label">Patients Waiting</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel full-panel">
+          <div class="panel-header">
+            <h2>Ward &amp; Bed Status Matrix</h2>
+          </div>
+          <div class="panel-body">
+            <div class="bed-grid">
+              @for (bed of beds; track bed.id) {
+                <div class="bed-tile" [class.bed-avail]="bed.status === 'AVAILABLE'" [class.bed-resv]="bed.status === 'RESERVED'" [class.bed-occ]="bed.status === 'OCCUPIED'" [class.bed-clean]="bed.status === 'CLEANING'">
+                  <div class="bed-tile-top">
+                    <span class="bed-num">{{ bed.bedNumber }}</span>
+                    <span class="bed-type">{{ bed.bedType }}</span>
+                  </div>
+                  <div class="bed-status-label">{{ bed.status }}</div>
+                  @if (bed.currentPatientName) {
+                    <div class="bed-patient">{{ bed.currentPatientName }}</div>
+                  }
+                  <div class="bed-ctrl">
+                    @if (bed.status === 'AVAILABLE') {
+                      <button class="btn-xs" (click)="changeBedStatus(bed.id, 'RESERVED')">Reserve</button>
+                    }
+                    @if (bed.status === 'RESERVED') {
+                      <button class="btn-xs" (click)="changeBedStatus(bed.id, 'OCCUPIED')">Admit</button>
+                    }
+                    @if (bed.status === 'OCCUPIED') {
+                      <button class="btn-xs" (click)="changeBedStatus(bed.id, 'CLEANING')">Discharge</button>
+                    }
+                    @if (bed.status === 'CLEANING') {
+                      <button class="btn-xs" (click)="changeBedStatus(bed.id, 'AVAILABLE')">Mark Ready</button>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        </section>
+      </div>
+    }
+
+    <!-- CITY COMMAND CENTER -->
+    @if (userRole === 'CITY_ADMIN') {
+      <div class="city-layout">
+        <section class="panel full-panel">
+          <div class="panel-header">
+            <h2>City-Wide Resource Summary</h2>
+          </div>
+          <div class="panel-body">
+            <div class="summary-row">
+              <div class="summary-tile">
+                <span class="sum-value">{{ hospitals.length }}</span>
+                <span class="sum-label">Monitored Facilities</span>
+              </div>
+              <div class="summary-tile">
+                <span class="sum-value">{{ totalCityAvailableBeds }} / {{ totalCityBeds }}</span>
+                <span class="sum-label">Available Beds City-Wide</span>
+              </div>
+              <div class="summary-tile" [class.sum-alert]="totalCityIcuAvailable < 5">
+                <span class="sum-value">{{ totalCityIcuAvailable }}</span>
+                <span class="sum-label">ICU Beds Available</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel full-panel">
+          <div class="panel-header">
+            <h2>Facility Status Overview</h2>
+          </div>
+          <div class="panel-body">
+            <div class="facility-grid">
+              @for (h of hospitals; track h.id) {
+                <div class="facility-card" [class.facility-critical]="h.status === 'CRITICAL'" [class.facility-high]="h.status === 'HIGH_OCCUPANCY'">
+                  <div class="fac-name">{{ h.name }}</div>
+                  <div class="fac-address">{{ h.address }}</div>
+                  <div class="fac-stats">
+                    <span>Total: <strong>{{ h.totalBeds }}</strong></span>
+                    <span>Available: <strong>{{ h.availableBeds }}</strong></span>
+                    <span>ICU: <strong>{{ h.availableIcuBeds }}/{{ h.totalIcuBeds }}</strong></span>
+                  </div>
+                  <span class="tag" [class.tag-critical]="h.status === 'CRITICAL'" [class.tag-warn]="h.status === 'HIGH_OCCUPANCY'" [class.tag-ok]="h.status === 'NORMAL'">{{ h.status }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        </section>
+
+        <section class="panel full-panel">
+          <div class="panel-header">
+            <h2>Inter-Hospital Transfer Coordination</h2>
+          </div>
+          <div class="panel-body">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Patient</th>
+                    <th>Bed Type</th>
+                    <th>Urgency</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (tr of transfers; track tr.id) {
+                    <tr>
+                      <td>#{{ tr.id }}</td>
+                      <td>{{ tr.patientName }}</td>
+                      <td><span class="tag">{{ tr.requiredBedType }}</span></td>
+                      <td><span class="tag tag-critical">{{ tr.urgency }}</span></td>
+                      <td><span class="status-chip" [ngClass]="getStatusClass(tr.status)">{{ tr.status }}</span></td>
+                      <td class="cell-actions">
+                        @if (tr.status === 'PENDING') {
+                          <button class="btn-sm btn-done" (click)="acceptTransfer(tr.id)">Accept &amp; Reserve</button>
+                          <button class="btn-sm btn-danger" (click)="rejectTransfer(tr.id)">Reject</button>
+                        }
+                      </td>
+                    </tr>
+                  }
+                  @if (transfers.length === 0) {
+                    <tr><td colspan="6" class="empty-cell">No active transfers</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </div>
+    }
+
+  </main>
+
+  <!-- TRANSFER RECOMMENDATION MODAL -->
+  <!-- ADMIT PATIENT MODAL -->
+  @if (showAdmitModal) {
+    <div class="overlay" (click)="closeAdmitModal()">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-top">
+          <h3>Admit — {{ admitTargetItem?.patientName }}</h3>
+          <button class="close-x" (click)="closeAdmitModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <label>Bed Type Required</label>
+            <select [(ngModel)]="admitBedType">
+              @for (bt of bedTypeOptions; track bt) {
+                <option [value]="bt">{{ bt }}</option>
+              }
+            </select>
+          </div>
+          <p class="empty-desc">If no {{ admitBedType }} bed is available at this hospital, we'll automatically search nearby hospitals and show you ranked alternatives.</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="closeAdmitModal()">Cancel</button>
+          <button class="btn-primary" (click)="submitAdmissionRequest()">Request Bed</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (showTransferModal) {
+    <div class="overlay" (click)="showTransferModal = false">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-top">
+          <h3>{{ transferBedType }} Transfer — Facility Search</h3>
+          <button class="close-x" (click)="showTransferModal = false">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="alert-banner alert-danger">
+            <strong>Capacity Exhausted:</strong> Current facility has 0 available {{ transferBedType }} beds. The system has ranked alternative facilities by availability, distance, and travel time.
+          </div>
+          <h4>Ranked Destinations</h4>
+          @if (transferLoading) {
+            <p class="empty-desc">Searching nearby hospitals for available ICU beds…</p>
+          } @else if (recommendations.length === 0) {
+            <div class="empty-state">
+              <p class="empty-title">No hospitals with available ICU beds found</p>
+              <p class="empty-desc">Every hospital in the network currently shows 0 available ICU beds. Try again shortly, or widen the search once more capacity data comes in.</p>
+            </div>
+          } @else {
+            <div class="rec-list">
+              @for (rec of recommendations; track rec.hospital.id) {
+                <div class="rec-row" [class.rec-selected]="selectedDestinationHospital?.hospital?.id === rec.hospital.id" (click)="selectedDestinationHospital = rec">
+                  <div class="rec-main">
+                    <strong>{{ rec.hospital.name }}</strong>
+                    <span class="rec-badge">{{ rec.tag }}</span>
+                  </div>
+                  <div class="rec-stats">
+                    <span>{{ rec.availableRequiredBeds }} ICU beds</span>
+                    <span>{{ rec.distanceKm }} km</span>
+                    <span>ETA {{ rec.estimatedTravelMinutes }} min</span>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="showTransferModal = false">Cancel</button>
+          <button class="btn-primary" [disabled]="!selectedDestinationHospital" (click)="confirmTransferInitiation()">
+            Dispatch Transfer to {{ selectedDestinationHospital?.hospital?.name }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- WHAT-IF SURGE SIMULATOR MODAL -->
+  @if (showWhatIfModal) {
+    <div class="overlay" (click)="showWhatIfModal = false">
+      <div class="modal modal-wide" (click)="$event.stopPropagation()">
+        <div class="modal-top">
+          <h3>Emergency Surge Simulator</h3>
+          <button class="close-x" (click)="showWhatIfModal = false">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="sim-control">
+            <label>Simulate additional ICU patients:</label>
+            <input type="range" min="5" max="100" step="5" [(ngModel)]="whatIfInput.additionalIcuPatients" (change)="runSimulation()">
+            <span class="sim-val">+{{ whatIfInput.additionalIcuPatients }}</span>
+          </div>
+
+          @if (whatIfResult) {
+            <div class="sim-results">
+              <div class="kpi-row">
+                <div class="kpi-card">
+                  <span class="kpi-value">{{ whatIfResult.currentCityIcuAvailable }}</span>
+                  <span class="kpi-label">Current ICU Capacity</span>
+                </div>
+                <div class="kpi-card kpi-danger">
+                  <span class="kpi-value">{{ whatIfResult.projectedShortage }}</span>
+                  <span class="kpi-label">Projected Deficit</span>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-value kpi-value-sm">{{ whatIfResult.severityLevel }}</span>
+                  <span class="kpi-label">Severity</span>
+                </div>
+              </div>
+
+              <h4>Redistribution Plan</h4>
+              <div class="redist-table">
+                @for (item of whatIfResult.redistributionPlan; track item.hospitalId) {
+                  <div class="redist-row">
+                    <span class="redist-name">{{ item.hospitalName }}</span>
+                    <span>Available: {{ item.currentAvailable }}</span>
+                    <span>Recommended: <strong>+{{ item.recommendedAllocation }}</strong></span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+  <!-- PATIENT HISTORY MODAL (doctor view) -->
+  @if (showHistoryModal) {
+    <div class="overlay" (click)="closeHistoryModal()">
+      <div class="modal modal-wide" (click)="$event.stopPropagation()">
+        <div class="modal-top">
+          <h3>Visit History — {{ historyPatientName }}</h3>
+          <button class="close-x" (click)="closeHistoryModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          @if (historyLoading) {
+            <p class="empty-desc">Loading history…</p>
+          } @else if (historyRecords.length === 0) {
+            <div class="empty-state">
+              <p class="empty-title">No prior visits on record</p>
+              <p class="empty-desc">This is the patient's first recorded visit.</p>
+            </div>
+          } @else {
+            <div class="rec-list">
+              @for (r of historyRecords; track r.id) {
+                <div class="rec-row">
+                  <div class="rec-main">
+                    <strong>{{ r.visitDate | date:'medium' }}</strong>
+                    <span class="rec-badge">Dr. {{ r.doctorName || 'Unknown' }}</span>
+                  </div>
+                  <dl class="token-details">
+                    @if (r.symptoms) { <dt>Symptoms</dt><dd>{{ r.symptoms }}</dd> }
+                    @if (r.diagnosis) { <dt>Diagnosis</dt><dd>{{ r.diagnosis }}</dd> }
+                    @if (r.prescription) { <dt>Prescription</dt><dd>{{ r.prescription }}</dd> }
+                    @if (r.bloodPressure) { <dt>BP</dt><dd>{{ r.bloodPressure }}</dd> }
+                    @if (r.temperatureCelsius) { <dt>Temp</dt><dd>{{ r.temperatureCelsius }}&deg;C</dd> }
+                    @if (r.pulseRate) { <dt>Pulse</dt><dd>{{ r.pulseRate }} bpm</dd> }
+                    @if (r.notes) { <dt>Notes</dt><dd>{{ r.notes }}</dd> }
+                  </dl>
+                </div>
+              }
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="closeHistoryModal()">Close</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- COMPLETE CONSULTATION MODAL (doctor view) -->
+  @if (showRecordModal) {
+    <div class="overlay" (click)="closeRecordModal()">
+      <div class="modal modal-wide" (click)="$event.stopPropagation()">
+        <div class="modal-top">
+          <h3>Complete Consultation — {{ recordTargetItem?.patientName }}</h3>
+          <button class="close-x" (click)="closeRecordModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <label>Symptoms</label>
+            <textarea rows="2" [(ngModel)]="recordForm.symptoms"></textarea>
+
+            <label>Diagnosis</label>
+            <textarea rows="2" [(ngModel)]="recordForm.diagnosis"></textarea>
+
+            <label>Prescription</label>
+            <textarea rows="2" [(ngModel)]="recordForm.prescription"></textarea>
+
+            <label>Notes</label>
+            <textarea rows="2" [(ngModel)]="recordForm.notes"></textarea>
+
+            <label>Blood Pressure</label>
+            <input type="text" placeholder="e.g. 120/80" [(ngModel)]="recordForm.bloodPressure">
+
+            <label>Temperature (&deg;C)</label>
+            <input type="number" step="0.1" [(ngModel)]="recordForm.temperatureCelsius">
+
+            <label>Pulse (bpm)</label>
+            <input type="number" [(ngModel)]="recordForm.pulseRate">
+
+            <label>Weight (kg)</label>
+            <input type="number" step="0.1" [(ngModel)]="recordForm.weightKg">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="closeRecordModal()">Cancel</button>
+          <button class="btn-primary" (click)="submitConsultationRecord()">Save &amp; Mark Completed</button>
+        </div>
+      </div>
+    </div>
+  }
+
+</div>

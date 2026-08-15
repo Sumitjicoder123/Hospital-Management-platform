@@ -1,0 +1,82 @@
+<div class="login-shell">
+  <div class="login-card">
+
+    <div class="brand-section">
+      <div class="brand-mark">CP</div>
+      <h1 class="brand-title">City Care Pulse</h1>
+      <p class="brand-desc">Hospital Resource &amp; Patient Flow Coordination</p>
+    </div>
+
+    <div class="tab-row">
+      <button [class.active]="activeTab === 'login'" (click)="activeTab = 'login'; error = null">Sign In</button>
+      <button [class.active]="activeTab === 'register'" (click)="activeTab = 'register'; error = null">Register</button>
+    </div>
+
+    @if (error) {
+      <div class="error-banner">{{ error }}</div>
+    }
+
+    <!-- LOGIN FORM -->
+    @if (activeTab === 'login') {
+      <form (ngSubmit)="onLogin()" class="auth-form">
+        <div class="field">
+          <label for="login-email">Email Address</label>
+          <input id="login-email" type="email" [(ngModel)]="loginForm.email" name="email" placeholder="doctor.h1@citypulse.in" autocomplete="email">
+        </div>
+        <div class="field">
+          <label for="login-password">Password</label>
+          <div class="input-with-icon">
+            <input id="login-password" [type]="showLoginPassword ? 'text' : 'password'" [(ngModel)]="loginForm.password" name="password" placeholder="Enter your password" autocomplete="current-password">
+            <button type="button" class="btn-eye" (click)="showLoginPassword = !showLoginPassword">
+              {{ showLoginPassword ? '🙈' : '👁️' }}
+            </button>
+          </div>
+        </div>
+        <button type="submit" class="btn-submit" [disabled]="loading">
+          {{ loading ? 'Signing in...' : 'Sign In' }}
+        </button>
+      </form>
+    }
+
+    <!-- REGISTER FORM -->
+    @if (activeTab === 'register') {
+      <form (ngSubmit)="onRegister()" class="auth-form">
+        <div class="field">
+          <label for="reg-name">Full Name</label>
+          <input id="reg-name" type="text" [(ngModel)]="registerForm.name" name="name" placeholder="Rahul Sharma" autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="reg-email">Email Address</label>
+          <input id="reg-email" type="email" [(ngModel)]="registerForm.email" name="email" placeholder="rahul@example.com" autocomplete="email">
+        </div>
+        <div class="field">
+          <label for="reg-phone">Phone Number</label>
+          <input id="reg-phone" type="tel" maxlength="10" [(ngModel)]="registerForm.phone" name="phone" placeholder="9811122233" autocomplete="tel">
+        </div>
+        <div class="field">
+          <label for="reg-password">Password</label>
+          <div class="input-with-icon">
+            <input id="reg-password" [type]="showRegisterPassword ? 'text' : 'password'" [(ngModel)]="registerForm.password" name="password" placeholder="Min 8 chars, 1 letter, 1 number" autocomplete="new-password">
+            <button type="button" class="btn-eye" (click)="showRegisterPassword = !showRegisterPassword">
+              {{ showRegisterPassword ? '🙈' : '👁️' }}
+            </button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="reg-confirm">Confirm Password</label>
+          <div class="input-with-icon">
+            <input id="reg-confirm" [type]="showConfirmPassword ? 'text' : 'password'" [(ngModel)]="registerForm.confirmPassword" name="confirmPassword" placeholder="Re-enter password" autocomplete="new-password">
+            <button type="button" class="btn-eye" (click)="showConfirmPassword = !showConfirmPassword">
+              {{ showConfirmPassword ? '🙈' : '👁️' }}
+            </button>
+          </div>
+        </div>
+        <p class="register-note">You will be registered as a Patient. Doctor and admin accounts are pre-provisioned.</p>
+        <button type="submit" class="btn-submit" [disabled]="loading">
+          {{ loading ? 'Creating account...' : 'Create Patient Account' }}
+        </button>
+      </form>
+    }
+
+  </div>
+</div>
