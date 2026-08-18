@@ -100,17 +100,90 @@ public class QueueService {
 
         int estimatedWait = calculateWaitTimeMinutes(doctor.getId(), req.getPriority());
         entry.setEstimatedWaitMinutes(estimatedWait);
+        entry.setExpectedConsultTime(LocalDateTime.now().plusMinutes(estimatedWait));
 
         queueEntryRepository.save(entry);
 
         // Broadcast real-time WebSocket update
         broadcastQueueUpdate(req.getHospitalId());
 
-        // Confirm the token over WhatsApp/SMS so the patient doesn't have to
-        // stay on a screen to know it worked (no-op if no phone/credentials).
         whatsAppService.sendTextMessage(entry.getPatientPhone(),
                 "Booked! Token *" + entry.getTokenNumber() + "*, estimated wait ~"
                         + entry.getEstimatedWaitMinutes() + " min. Reply *status* anytime to check your position.");
+
+        return entry;
+    }
+
+    @Transactional
+    public Appointment scheduleAppointment(com.hospital.platform.dto.OperationDTOs.ScheduledAppointmentRequest req) {
+        // Prevent booking if they already have an appointment at this exact slot (basic check)
+        List<Appointment> existing = appointmentRepository.findByPatientPhone(req.getPatientPhone());
+        boolean hasConflict = existing.stream().anyMatch(a -> a.getStatus() == Appointment.AppointmentStatus.SCHEDULED && a.getAppointmentTime().isEqual(req.getSlotStart()));
+        if (hasConflict) {
+            throw new RuntimeException("Patient already has a scheduled appointment at this time.");
+        }
+
+        Long resolvedPatientId = req.getPatientId();
+        var patient = patientService.findOrCreateByPhone(req.getPatientName(), req.getPatientPhone());
+        if (patient != null) {
+            resolvedPatientId = patient.getId();
+        }
+
+        Appointment appt = new Appointment(
+                resolvedPatientId,
+                req.getPatientName(),
+                req.getPatientPhone(),
+                req.getDoctorId(),
+                req.getDepartmentId(),
+                req.getHospitalId(),
+                req.getSlotStart(),
+                req.getBookingChannel()
+        );
+        appt.setStatus(Appointment.AppointmentStatus.SCHEDULED);
+        return appointmentRepository.save(appt);
+    }
+
+    @Transactional
+    public QueueEntry checkInScheduledAppointment(Long appointmentId) {
+        Appointment appt = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new RuntimeException("Appointment not found: " + appointmentId));
+
+        if (appt.getStatus() != Appointment.AppointmentStatus.SCHEDULED) {
+            throw new RuntimeException("Appointment is not in SCHEDULED state.");
+        }
+
+        // Prevent checking in on wrong day (optional strictness, but let's allow today)
+        if (!appt.getAppointmentTime().toLocalDate().isEqual(java.time.LocalDate.now())) {
+            throw new RuntimeException("Can only check-in on the day of the appointment.");
+        }
+
+        appt.setStatus(Appointment.AppointmentStatus.CHECKED_IN);
+        appointmentRepository.save(appt);
+
+        Doctor doctor = doctorRepository.findById(appt.getDoctorId()).orElseThrow();
+        Department dept = departmentRepository.findById(appt.getDepartmentId()).orElseThrow();
+
+        String deptPrefix = dept.getCode() != null ? dept.getCode() : "OPD";
+        long currentCount = queueEntryRepository.countWaitingPatientsByDoctor(doctor.getId()) + 1;
+        String tokenNumber = String.format("%s-%03d", deptPrefix, currentCount);
+
+        QueueEntry entry = new QueueEntry(
+                appt.getId(),
+                tokenNumber,
+                appt.getPatientName(),
+                appt.getPatientPhone(),
+                appt.getDoctorId(),
+                appt.getHospitalId(),
+                QueueEntry.Priority.NORMAL
+        );
+        entry.setPatientId(appt.getPatientId());
+
+        int estimatedWait = calculateWaitTimeMinutes(doctor.getId(), QueueEntry.Priority.NORMAL);
+        entry.setEstimatedWaitMinutes(estimatedWait);
+        entry.setExpectedConsultTime(LocalDateTime.now().plusMinutes(estimatedWait));
+
+        queueEntryRepository.save(entry);
+        broadcastQueueUpdate(appt.getHospitalId());
 
         return entry;
     }
@@ -133,7 +206,27 @@ public class QueueService {
     }
 
     public List<QueueEntry> getQueueByPatientPhone(String phone) {
-        return queueEntryRepository.findByPatientPhone(phone);
+        String normalized = PatientService.normalizePhone(phone);
+        return queueEntryRepository.findByPatientPhone(normalized);
+    }
+
+    public List<QueueEntry> getQueueByPatientPhoneAndName(String phone, String name) {
+        String normalized = PatientService.normalizePhone(phone);
+        return queueEntryRepository.findByPatientPhoneAndPatientName(normalized, name);
+    }
+
+    public List<Appointment> getPatientAppointments(String phone) {
+        String normalized = PatientService.normalizePhone(phone);
+        return appointmentRepository.findByPatientPhone(normalized).stream()
+                .filter(a -> a.getStatus() == Appointment.AppointmentStatus.SCHEDULED)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    public List<Appointment> getPatientAppointmentsByPhoneAndName(String phone, String name) {
+        String normalized = PatientService.normalizePhone(phone);
+        return appointmentRepository.findByPatientPhoneAndPatientName(normalized, name).stream()
+                .filter(a -> a.getStatus() == Appointment.AppointmentStatus.SCHEDULED)
+                .collect(java.util.stream.Collectors.toList());
     }
 
     @Transactional
@@ -157,12 +250,13 @@ public class QueueService {
         );
 
         Doctor doctor = doctorRepository.findById(doctorId).orElse(null);
-        int avgTime = doctor != null ? doctor.getConsultationAvgTimeMinutes() : 6;
+        int avgTime = (doctor != null && doctor.getConsultationAvgTimeMinutes() != null) ? doctor.getConsultationAvgTimeMinutes() : 15;
 
         for (int i = 0; i < waiting.size(); i++) {
             QueueEntry q = waiting.get(i);
             int est = i * avgTime;
             q.setEstimatedWaitMinutes(est);
+            q.setExpectedConsultTime(LocalDateTime.now().plusMinutes(est));
             queueEntryRepository.save(q);
 
             // Nudge the patient who is now next (or about to be) so they can
@@ -180,7 +274,7 @@ public class QueueService {
     public int calculateWaitTimeMinutes(Long doctorId, QueueEntry.Priority priority) {
         Long waitingAhead = queueEntryRepository.countWaitingPatientsByDoctor(doctorId);
         Doctor doctor = doctorRepository.findById(doctorId).orElse(null);
-        int avgTime = doctor != null ? doctor.getConsultationAvgTimeMinutes() : 6;
+        int avgTime = (doctor != null && doctor.getConsultationAvgTimeMinutes() != null) ? doctor.getConsultationAvgTimeMinutes() : 15;
 
         double baseWait = waitingAhead * avgTime;
         // Apply priority adjustment factor

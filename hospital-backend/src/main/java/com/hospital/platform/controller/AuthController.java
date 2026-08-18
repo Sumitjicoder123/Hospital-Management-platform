@@ -27,11 +27,25 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<AuthResponse> getCurrentUser(@RequestHeader("Authorization") String authHeader) {
+    public ResponseEntity<?> getCurrentUser(@RequestHeader("Authorization") String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return ResponseEntity.status(401).build();
         }
         String token = authHeader.substring(7);
-        return ResponseEntity.ok(authService.getCurrentUser(token));
+        try {
+            return ResponseEntity.ok(authService.getCurrentUser(token));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(java.util.Map.of("message", e.getMessage() != null ? e.getMessage() : e.toString()));
+        }
+    }
+
+    @PutMapping("/profile")
+    public ResponseEntity<AuthResponse> completeProfile(@RequestHeader("Authorization") String authHeader, @Valid @RequestBody CompleteProfileRequest request) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(401).build();
+        }
+        String token = authHeader.substring(7);
+        return ResponseEntity.ok(authService.completeProfile(token, request));
     }
 }

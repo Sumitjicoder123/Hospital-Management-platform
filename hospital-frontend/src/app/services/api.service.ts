@@ -23,6 +23,14 @@ export class ApiService {
     return this.http.get(`${this.baseUrl}/auth/me`);
   }
 
+  getCurrentUser(): Observable<any> {
+    return this.http.get(`${this.baseUrl}/auth/me`);
+  }
+
+  completeProfile(data: any): Observable<any> {
+    return this.http.put(`${this.baseUrl}/auth/profile`, data);
+  }
+
   // Hospitals
   getHospitals(): Observable<any[]> {
     return this.http.get<any[]>(`${this.baseUrl}/hospitals`);
@@ -36,7 +44,7 @@ export class ApiService {
     return this.http.get<any[]>(`${this.baseUrl}/hospitals/${hospitalId}/departments`);
   }
 
-  getDoctors(hospitalId: number, departmentId?: number): Observable<any[]> {
+  getDoctors(hospitalId: number, departmentId?: number | null): Observable<any[]> {
     let url = `${this.baseUrl}/hospitals/${hospitalId}/doctors`;
     if (departmentId) url += `?departmentId=${departmentId}`;
     return this.http.get<any[]>(url);
@@ -57,6 +65,10 @@ export class ApiService {
 
   getPatientQueue(phone: string): Observable<any[]> {
     return this.http.get<any[]>(`${this.baseUrl}/queues/patient?phone=${phone}`);
+  }
+
+  getPatientQueueByPhoneAndName(phone: string, name: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/queues/patient?phone=${phone}&name=${encodeURIComponent(name)}`);
   }
 
   updateQueueStatus(id: number, status: string): Observable<any> {
@@ -99,8 +111,12 @@ export class ApiService {
     return this.http.get<any[]>(`${this.baseUrl}/transfers/hospital/${hospitalId}`);
   }
 
-  getHospitalRecommendations(sourceHospitalId: number, requiredBedType: string): Observable<any[]> {
-    return this.http.get<any[]>(`${this.baseUrl}/transfers/recommend?sourceHospitalId=${sourceHospitalId}&requiredBedType=${encodeURIComponent(requiredBedType)}`);
+  getHospitalRecommendations(sourceHospitalId: number | null, requiredBedType: string): Observable<any[]> {
+    let url = `${this.baseUrl}/transfers/recommend?requiredBedType=${encodeURIComponent(requiredBedType)}`;
+    if (sourceHospitalId !== null) {
+      url += `&sourceHospitalId=${sourceHospitalId}`;
+    }
+    return this.http.get<any[]>(url);
   }
 
   initiateTransfer(patientId: number | null, patientName: string, sourceHospitalId: number, destinationHospitalId: number, requiredBedType: string, urgency: string, notes: string): Observable<any> {
@@ -134,9 +150,54 @@ export class ApiService {
     return this.http.get<any[]>(`${this.baseUrl}/medical-records/phone/${phone}`);
   }
 
+  getPatientHistoryByPhoneAndName(phone: string, name: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/medical-records/phone/${phone}?name=${encodeURIComponent(name)}`);
+  }
+
+  // Doctor Availability & Scheduling
+  getDoctorAvailability(doctorId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/doctors/${doctorId}/availability`);
+  }
+
+  getDoctorAvailabilitySummary(doctorId: number, month: number, year: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/doctors/${doctorId}/availability-summary?month=${month}&year=${year}`);
+  }
+
+  saveDoctorAvailability(doctorId: number, data: any[]): Observable<any> {
+    return this.http.put(`${this.baseUrl}/doctors/${doctorId}/availability`, data);
+  }
+
+  getAvailableSlots(doctorId: number, from: string, to: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/doctors/${doctorId}/slots?from=${from}&to=${to}`);
+  }
+
+  scheduleAppointment(data: any): Observable<any> {
+    return this.http.post(`${this.baseUrl}/appointments/schedule`, data);
+  }
+
+  checkInScheduledAppointment(appointmentId: number): Observable<any> {
+    return this.http.post(`${this.baseUrl}/appointments/${appointmentId}/check-in`, {});
+  }
+
+  getPatientAppointments(phone: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/appointments/patient?phone=${phone}`);
+  }
+
+  getPatientAppointmentsByPhoneAndName(phone: string, name: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/appointments/patient?phone=${phone}&name=${encodeURIComponent(name)}`);
+  }
+
   // WhatsApp bot - "simulate" lets you test the booking conversation from the
   // UI without a real WhatsApp number connected (see WhatsAppWebhookController).
   simulateWhatsAppMessage(phone: string, message: string): Observable<{ reply: string }> {
-    return this.http.post<{ reply: string }>(`${this.baseUrl}/whatsapp/simulate`, { phone, message });
+    return this.http.post<{ reply: string }>(`${this.baseUrl}/whatsapp/simulate`, {
+      From: `whatsapp:+91${phone}`,
+      Body: message
+    });
+  }
+
+  // --- ADMIN API ---
+  onboardDoctor(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/admin/doctors/register`, payload);
   }
 }

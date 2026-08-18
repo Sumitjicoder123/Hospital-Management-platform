@@ -22,7 +22,7 @@ public class Patient {
 
     // Normalized: digits only, no spaces/dashes/+prefix. This is the actual
     // join key used to recognize a returning patient.
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String phone;
 
     private String email;

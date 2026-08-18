@@ -11,6 +11,7 @@ public interface QueueEntryRepository extends JpaRepository<QueueEntry, Long> {
     List<QueueEntry> findByHospitalId(Long hospitalId);
     List<QueueEntry> findByDoctorIdOrderByArrivalTimeAsc(Long doctorId);
     List<QueueEntry> findByPatientPhone(String phone);
+    List<QueueEntry> findByPatientPhoneAndPatientName(String phone, String name);
     List<QueueEntry> findByPatientId(Long patientId);
     
     @Query("SELECT COUNT(q) FROM QueueEntry q WHERE q.doctorId = :doctorId AND q.status = 'WAITING'")

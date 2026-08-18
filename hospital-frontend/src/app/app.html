@@ -90,8 +90,19 @@
             </div>
             <div class="panel-body">
               <div class="field">
+                <label>Booking For</label>
+                <div style="display: flex; gap: 16px; margin-bottom: 8px;">
+                  <label style="font-weight: normal; font-size: 0.9rem;">
+                    <input type="radio" name="bookingFor" value="MYSELF" [(ngModel)]="bookingForMode" (change)="onBookingModeChange()"> Myself
+                  </label>
+                  <label style="font-weight: normal; font-size: 0.9rem;">
+                    <input type="radio" name="bookingFor" value="FAMILY" [(ngModel)]="bookingForMode" (change)="onBookingModeChange()"> Family Member / Ward
+                  </label>
+                </div>
+              </div>
+              <div class="field">
                 <label>Patient Name</label>
-                <input type="text" [(ngModel)]="bookingForm.patientName" disabled>
+                <input type="text" [(ngModel)]="bookingForm.patientName" [disabled]="bookingForMode === 'MYSELF'">
               </div>
               <div class="field">
                 <label>Phone</label>
@@ -115,31 +126,121 @@
               </div>
               <div class="field">
                 <label>Doctor</label>
-                <select [(ngModel)]="bookingForm.doctorId">
+                <select [(ngModel)]="bookingForm.doctorId" (change)="generateCalendar()">
                   @for (doc of doctors; track doc.id) {
-                    <option [value]="doc.id">Dr. {{ doc.name }} &mdash; {{ doc.specialization }}</option>
+                    <option [value]="doc.id">{{ formatDoctorName(doc.name) }} &mdash; {{ doc.specialization }}</option>
                   }
                 </select>
               </div>
               <div class="field">
-                <label>Triage Priority</label>
-                <select [(ngModel)]="bookingForm.priority">
-                  <option value="ROUTINE">Routine</option>
-                  <option value="NORMAL">Normal</option>
-                  <option value="HIGH">High</option>
-                  <option value="CRITICAL">Critical</option>
-                  <option value="EMERGENCY">Emergency</option>
-                </select>
+                <label>Booking Mode</label>
+                <div style="display: flex; gap: 16px; margin-bottom: 8px;">
+                  <label style="font-weight: normal; font-size: 0.9rem;">
+                    <input type="radio" name="bookingMode" value="WALK_IN" [(ngModel)]="bookingForm.bookingMode"> Walk-In (Queue Now)
+                  </label>
+                  <label style="font-weight: normal; font-size: 0.9rem;">
+                    <input type="radio" name="bookingMode" value="SCHEDULED" [(ngModel)]="bookingForm.bookingMode" (change)="generateCalendar()"> Scheduled
+                  </label>
+                </div>
               </div>
+              @if (bookingForm.bookingMode === 'SCHEDULED') {
+                <div class="calendar-container" style="background: var(--bg-card); padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 16px;">
+                  <div class="calendar-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <button class="btn-sm btn-secondary" (click)="changeMonth(-1)">&larr;</button>
+                    <strong style="font-size: 0.95rem;">{{ getCalendarMonthName() }}</strong>
+                    <button class="btn-sm btn-secondary" (click)="changeMonth(1)">&rarr;</button>
+                  </div>
+                  @if (calendarLoading) {
+                    <div style="text-align: center; padding: 20px; font-size: 0.85rem; color: var(--text-muted);">Loading calendar...</div>
+                  } @else {
+                    <div class="calendar-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 16px;">
+                      <div class="cal-day-header" style="text-align: center; font-size: 0.75rem; color: var(--text-muted); font-weight: var(--font-weight-bold);">Su</div>
+                      <div class="cal-day-header" style="text-align: center; font-size: 0.75rem; color: var(--text-muted); font-weight: var(--font-weight-bold);">Mo</div>
+                      <div class="cal-day-header" style="text-align: center; font-size: 0.75rem; color: var(--text-muted); font-weight: var(--font-weight-bold);">Tu</div>
+                      <div class="cal-day-header" style="text-align: center; font-size: 0.75rem; color: var(--text-muted); font-weight: var(--font-weight-bold);">We</div>
+                      <div class="cal-day-header" style="text-align: center; font-size: 0.75rem; color: var(--text-muted); font-weight: var(--font-weight-bold);">Th</div>
+                      <div class="cal-day-header" style="text-align: center; font-size: 0.75rem; color: var(--text-muted); font-weight: var(--font-weight-bold);">Fr</div>
+                      <div class="cal-day-header" style="text-align: center; font-size: 0.75rem; color: var(--text-muted); font-weight: var(--font-weight-bold);">Sa</div>
+                      @for (day of calendarDays; track day?.dateStr || $index) {
+                        @if (day) {
+                          <div class="cal-day" 
+                               [class.cal-past]="day.isPast" 
+                               [class.cal-avail]="!day.isPast && day.hasAvailability" 
+                               [class.cal-selected]="selectedDateStr === day.dateStr"
+                               (click)="selectDate(day)"
+                               style="text-align: center; padding: 6px 0; border-radius: 4px; border: 1px solid var(--border-color); font-size: 0.85rem; transition: var(--transition-base);"
+                               [style.background]="selectedDateStr === day.dateStr ? 'var(--primary-color)' : (!day.isPast && day.hasAvailability ? '#e0f2fe' : 'transparent')"
+                               [style.color]="selectedDateStr === day.dateStr ? '#fff' : (day.isPast ? 'var(--text-muted)' : 'var(--text-primary)')"
+                               [style.opacity]="day.isPast ? '0.5' : '1'"
+                               [style.cursor]="day.isPast || !day.hasAvailability ? 'not-allowed' : 'pointer'"
+                               [style.border-color]="selectedDateStr === day.dateStr ? 'var(--primary-color)' : (!day.isPast && day.hasAvailability ? '#bae6fd' : 'var(--border-color)')">
+                            {{ day.date.getDate() }}
+                          </div>
+                        } @else {
+                          <div class="cal-empty"></div>
+                        }
+                      }
+                    </div>
+                  }
+                  
+                  @if (selectedDateStr) {
+                    <div class="field">
+                      <label>Available Slots on {{ selectedDateStr | date:'mediumDate' }}</label>
+                      <select [(ngModel)]="bookingForm.slotStart" [disabled]="slotsLoading || availableSlots.length === 0">
+                        @if (slotsLoading) {
+                          <option [ngValue]="null">Loading slots...</option>
+                        }
+                        @for (slot of availableSlots; track slot.slotStart) {
+                          <option [value]="slot.slotStart">{{ slot.slotStart | date:'shortTime' }} - {{ slot.slotEnd | date:'shortTime' }}</option>
+                        }
+                      </select>
+                      @if (!slotsLoading && availableSlots.length === 0) {
+                        <div style="font-size: 0.8rem; color: var(--error-color); margin-top: 4px;">No slots available on this date.</div>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+              @if (bookingForm.bookingMode === 'WALK_IN') {
+                <div class="field">
+                  <label>Triage Priority</label>
+                  <select [(ngModel)]="bookingForm.priority">
+                    <option value="NORMAL">Normal (Routine Checkup)</option>
+                    <option value="EMERGENCY">Emergency (Requires Immediate Attention)</option>
+                  </select>
+                </div>
+              }
               <button class="btn-primary full-width" (click)="submitBooking()">Generate Token</button>
             </div>
           </section>
 
           <section class="panel">
             <div class="panel-header">
-              <h2>My Queue Tokens</h2>
+              <h2>My Queue Tokens & Appointments</h2>
             </div>
             <div class="panel-body">
+              @if (patientScheduledAppointments.length > 0) {
+                <h3 style="font-size: 1rem; margin-bottom: 8px; color: var(--text-primary);">Scheduled Appointments</h3>
+                @for (appt of patientScheduledAppointments; track appt.id) {
+                  <div class="token-card" style="margin-bottom: 16px; background: #e0f2fe; border: 1px solid #bae6fd;">
+                    <div class="token-meta-row">
+                      <span class="tag tag-ok">{{ appt.status }}</span>
+                    </div>
+                    <div class="wait-display">
+                      <span class="wait-number">{{ appt.appointmentTime | date:'medium' }}</span>
+                      <span class="wait-unit">Scheduled Slot</span>
+                    </div>
+                    <dl class="token-details">
+                      <dt>Doctor</dt><dd>ID: {{ appt.doctorId }}</dd>
+                      <dt>Hospital</dt><dd>ID: {{ appt.hospitalId }}</dd>
+                    </dl>
+                    <button class="btn-primary full-width" style="margin-top: 12px; font-size: 0.85rem;" (click)="checkInScheduled(appt.id)">Check In Now</button>
+                  </div>
+                }
+                <hr style="margin: 16px 0; border: none; border-top: 1px solid var(--border-color);" />
+              }
+
+              <h3 style="font-size: 1rem; margin-bottom: 8px; color: var(--text-primary);">Live Queue Tokens</h3>
               @for (token of patientTokens; track token.id) {
                 <div class="token-card" style="margin-bottom: 16px;">
                   <div class="token-id">{{ token.tokenNumber }}</div>
@@ -149,20 +250,20 @@
                   </div>
                   @if (token.status === 'WAITING' || token.status === 'CALLED') {
                     <div class="wait-display">
-                      <span class="wait-number">{{ token.estimatedWaitMinutes }}</span>
-                      <span class="wait-unit">min estimated wait</span>
+                      <span class="wait-number">{{ token.expectedConsultTime | date:'shortTime' }}</span>
+                      <span class="wait-unit">Estimated Time</span>
                     </div>
                   }
                   <dl class="token-details">
                     <dt>Patient</dt><dd>{{ token.patientName }}</dd>
-                    <dt>Hospital</dt><dd>{{ token.hospitalId }}</dd>
+                    <dt>Hospital</dt><dd>ID: {{ token.hospitalId }}</dd>
                   </dl>
                 </div>
               }
-              @if (patientTokens.length === 0) {
+              @if (patientTokens.length === 0 && patientScheduledAppointments.length === 0) {
                 <div class="empty-state">
-                  <p class="empty-title">No active token</p>
-                  <p class="empty-desc">Use the booking form to generate a queue token.</p>
+                  <p class="empty-title">No appointments or tokens</p>
+                  <p class="empty-desc">Use the booking form to schedule a slot or generate a queue token.</p>
                 </div>
               }
             </div>
@@ -192,12 +293,13 @@
           <div class="panel-body">
             @for (rec of patientHistoryRecords; track rec.id) {
               <div style="background: #f8fafc; border: 1px solid var(--border-color); padding: 16px; border-radius: 8px; margin-bottom: 12px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 12px; background: #eef2f6; padding: 10px; border-radius: 6px;">
                   <div>
-                    <strong>Date:</strong> {{ rec.createdAt | date:'medium' }}
+                    <span style="font-weight: 600; color: #0f172a;">Visit Date:</span> {{ rec.visitDate | date:'mediumDate' }} 
+                    <span style="margin-left: 16px; font-weight: 600; color: #0f172a;">Time:</span> {{ rec.visitDate | date:'shortTime' }}
                   </div>
                   <div>
-                    <strong>Doctor:</strong> Dr. {{ rec.doctorName }}
+                    <span style="font-weight: 600; color: #0f172a;">Doctor ID:</span> {{ rec.doctorId }}
                   </div>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.85rem; color: var(--text-secondary);">
@@ -221,23 +323,45 @@
       @if (patientView === 'BEDS') {
         <section class="panel full-panel">
           <div class="panel-header">
-            <h2>Available Beds</h2>
+            <h2>Find Available Beds</h2>
+            <p class="subtitle">Search for real-time bed availability across the city.</p>
           </div>
           <div class="panel-body">
-             <div class="kpi-row">
-                <div class="kpi-card">
-                  <span class="kpi-value">{{ selectedHospital?.availableBeds || 0 }}</span>
-                  <span class="kpi-label">General Beds</span>
-                </div>
-                <div class="kpi-card">
-                  <span class="kpi-value">{{ selectedHospital?.availableIcuBeds || 0 }}</span>
-                  <span class="kpi-label">ICU Beds</span>
-                </div>
-                <div class="kpi-card">
-                  <span class="kpi-value">{{ selectedHospital?.availableEmergencyBeds || 0 }}</span>
-                  <span class="kpi-label">Emergency Beds</span>
-                </div>
+             <div class="field" style="display: flex; gap: 12px; align-items: flex-end; margin-bottom: 20px;">
+               <div style="flex: 1;">
+                 <label>Required Bed Type</label>
+                 <select [(ngModel)]="bedSearchType">
+                   <option value="GENERAL">General Ward</option>
+                   <option value="ICU">ICU (Intensive Care)</option>
+                   <option value="EMERGENCY">Emergency Room</option>
+                 </select>
+               </div>
+               <button class="btn-primary" (click)="searchBeds()" [disabled]="bedSearchLoading">
+                 {{ bedSearchLoading ? 'Searching...' : 'Find Nearest Beds' }}
+               </button>
              </div>
+             
+             @if (bedSearchResults.length > 0) {
+               <div style="display: flex; flex-direction: column; gap: 12px;">
+                 @for (match of bedSearchResults; track match.hospital.id) {
+                   <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                     <div>
+                       <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                         <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-primary);">{{ match.hospital.name }}</h3>
+                         @if (match.tag) {
+                           <span class="tag tag-ok">{{ match.tag }}</span>
+                         }
+                       </div>
+                       <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">{{ match.distanceKm }} km away &bull; ~{{ match.estimatedTravelMinutes }} min ETA</p>
+                     </div>
+                     <div style="text-align: right;">
+                       <div style="font-size: 1.5rem; font-weight: 700; color: #0284c7;">{{ match.availableRequiredBeds }}</div>
+                       <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">Available Beds</div>
+                     </div>
+                   </div>
+                 }
+               </div>
+             }
           </div>
         </section>
       }
@@ -248,19 +372,38 @@
             <h2>Available Departments</h2>
           </div>
           <div class="panel-body">
-            <div class="facility-grid">
-              @for (d of departments; track d.id) {
-                <div class="facility-card">
-                  <div class="fac-name">{{ d.name }}</div>
-                  <div class="fac-address">Code: {{ d.code }}</div>
-                </div>
-              }
-              @if (departments.length === 0) {
-                 <div class="empty-state" style="grid-column: 1 / -1">
-                  <p class="empty-title">No Departments Available</p>
-                 </div>
-              }
-            </div>
+            @if (selectedDepartmentForView) {
+              <button class="btn-secondary" style="margin-bottom: 20px;" (click)="selectedDepartmentForView = null">← Back to Departments</button>
+              <h3>Doctors in {{ selectedDepartmentForView.name }}</h3>
+              <div class="facility-grid">
+                @for (doc of departmentDoctorsForView; track doc.id) {
+                  <div class="facility-card">
+                    <div class="fac-name">{{ formatDoctorName(doc.name) }}</div>
+                    <div class="fac-address">{{ doc.specialization }}</div>
+                    <button class="btn-primary" style="margin-top: 12px; padding: 6px 12px; font-size: 0.85rem;" (click)="bookFromDepartment(doc)">Book Appointment</button>
+                  </div>
+                }
+                @if (departmentDoctorsForView.length === 0) {
+                  <div class="empty-state" style="grid-column: 1 / -1">
+                    <p class="empty-title">No Doctors Available</p>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="facility-grid">
+                @for (d of departments; track d.id) {
+                  <div class="facility-card" style="cursor: pointer;" (click)="viewDepartmentDoctors(d)">
+                    <div class="fac-name">{{ d.name }}</div>
+                    <div class="fac-address">Code: {{ d.code }}</div>
+                  </div>
+                }
+                @if (departments.length === 0) {
+                   <div class="empty-state" style="grid-column: 1 / -1">
+                    <p class="empty-title">No Departments Available</p>
+                   </div>
+                }
+              </div>
+            }
           </div>
         </section>
       }
@@ -274,13 +417,14 @@
             <h2>OPD Queue Management</h2>
             <p class="subtitle">Call patients, manage consultations, and initiate transfers</p>
           </div>
-          <div class="doctor-info">
+          <div class="doctor-info" style="display: flex; gap: 12px; align-items: center;">
+            <button class="btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;" (click)="openAvailabilityModal()">Manage Availability</button>
             {{ currentUser?.name }} &middot; {{ queue.length }} in queue
           </div>
         </div>
         <div class="panel-body">
           <div class="table-wrap">
-            <table>
+            <table class="queue-table">
               <thead>
                 <tr>
                   <th>Token</th>
@@ -293,29 +437,58 @@
                 </tr>
               </thead>
               <tbody>
-                @for (item of queue; track item.id) {
-                  <tr [class.row-active]="item.status === 'IN_CONSULTATION'">
-                    <td class="cell-token">{{ item.tokenNumber }}</td>
-                    <td>{{ item.patientName }}</td>
-                    <td><span class="tag" [class.tag-critical]="item.priority === 'EMERGENCY' || item.priority === 'CRITICAL'" [class.tag-warn]="item.priority === 'HIGH'" [class.tag-ok]="item.priority === 'NORMAL' || item.priority === 'ROUTINE'">{{ item.priority }}</span></td>
-                    <td>{{ item.arrivalTime | date:'shortTime' }}</td>
-                    <td><span class="status-chip" [ngClass]="getStatusClass(item.status)">{{ item.status }}</span></td>
-                    <td>{{ item.estimatedWaitMinutes }} min</td>
-                    <td class="cell-actions">
-                      <button class="btn-sm btn-secondary" (click)="openPatientHistory(item)">History</button>
-                      @if (item.status === 'WAITING') {
-                        <button class="btn-sm btn-call" (click)="updateQueueStatus(item.id, 'IN_CONSULTATION')">Call</button>
-                      }
-                      @if (item.status === 'IN_CONSULTATION') {
-                        <button class="btn-sm btn-done" (click)="openCompleteConsultation(item)">Complete</button>
-                        <button class="btn-sm btn-secondary" (click)="openAdmitModal(item)">Admit</button>
-                        <button class="btn-sm btn-danger" (click)="triggerTransferModal(item)">Request ICU Transfer</button>
-                      }
-                    </td>
-                  </tr>
-                }
-                @if (queue.length === 0) {
-                  <tr><td colspan="7" class="empty-cell">No patients in queue</td></tr>
+                @if (isLoading) {
+                  @for (i of [1, 2, 3]; track i) {
+                    <tr class="skeleton-box" style="height: 60px; margin-bottom: 8px;">
+                      <td colspan="7"></td>
+                    </tr>
+                  }
+                } @else {
+                  @for (item of queue; track item.id) {
+                    <tr [class.row-active]="item.status === 'IN_CONSULTATION'">
+                      <td data-label="Token" class="cell-token">{{ item.tokenNumber }}</td>
+                      <td data-label="Patient">{{ item.patientName }}</td>
+                      <td data-label="Priority">
+                        <span class="tag" [class.tag-critical]="item.priority === 'EMERGENCY' || item.priority === 'CRITICAL'" [class.tag-warn]="item.priority === 'HIGH'" [class.tag-ok]="item.priority === 'NORMAL' || item.priority === 'ROUTINE'">
+                          @if (item.priority === 'EMERGENCY' || item.priority === 'CRITICAL') { 🚨 }
+                          @if (item.priority === 'HIGH') { ⚠️ }
+                          @if (item.priority === 'NORMAL' || item.priority === 'ROUTINE') { 🟢 }
+                          {{ item.priority }}
+                        </span>
+                      </td>
+                      <td data-label="Arrival">{{ item.arrivalTime | date:'shortTime' }}</td>
+                      <td data-label="Status">
+                        <span class="status-chip" [ngClass]="getStatusClass(item.status)">
+                          @if (item.status === 'WAITING') { ⏳ }
+                          @if (item.status === 'IN_CONSULTATION') { 🩺 }
+                          @if (item.status === 'COMPLETED') { ✅ }
+                          {{ item.status }}
+                        </span>
+                      </td>
+                      <td data-label="Est. Wait">{{ item.estimatedWaitMinutes }} min</td>
+                      <td data-label="Actions" class="cell-actions">
+                        <button class="btn-sm btn-secondary" (click)="openPatientHistory(item)">History</button>
+                        @if (item.status === 'WAITING') {
+                          <button class="btn-sm btn-call" (click)="updateQueueStatus(item.id, 'IN_CONSULTATION')">Call</button>
+                        }
+                        @if (item.status === 'IN_CONSULTATION') {
+                          <button class="btn-sm btn-done" (click)="openCompleteConsultation(item)">Complete</button>
+                          <button class="btn-sm btn-secondary" (click)="openAdmitModal(item)">Admit</button>
+                          <button class="btn-sm btn-danger" (click)="triggerTransferModal(item)">Request ICU Transfer</button>
+                        }
+                      </td>
+                    </tr>
+                  }
+                  @if (queue.length === 0) {
+                    <tr>
+                      <td colspan="7" style="padding: 32px 0;">
+                        <div class="empty-state">
+                          <p class="empty-title">No patients in queue</p>
+                          <p class="empty-desc">Your OPD queue is currently empty.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  }
                 }
               </tbody>
             </table>
@@ -327,33 +500,50 @@
     <!-- HOSPITAL ADMIN -->
     @if (userRole === 'HOSPITAL_ADMIN') {
       <div class="admin-layout">
-        <section class="panel full-panel">
-          <div class="panel-header">
+        <section class="panel panel-admin full-panel">
+          <div class="panel-header row-between">
             <h2>{{ selectedHospital?.name }} &mdash; Capacity Overview</h2>
+            <button class="btn-primary" (click)="openAddDoctorModal()">+ Onboard Doctor</button>
           </div>
           <div class="panel-body">
-            <div class="kpi-row">
-              <div class="kpi-card">
-                <span class="kpi-value">{{ selectedHospital?.availableBeds }}<small>/{{ selectedHospital?.totalBeds }}</small></span>
-                <span class="kpi-label">General Beds</span>
+            <div class="kpi-row" style="display: flex; gap: 20px; flex-wrap: wrap;">
+              <div style="flex: 1; display: flex; gap: 20px; flex-wrap: wrap; min-width: 300px;">
+                @if (isLoading) {
+                  <div class="kpi-card skeleton-box" style="height: 80px;"></div>
+                  <div class="kpi-card skeleton-box" style="height: 80px;"></div>
+                  <div class="kpi-card skeleton-box" style="height: 80px;"></div>
+                  <div class="kpi-card skeleton-box" style="height: 80px;"></div>
+                } @else {
+                  <div class="kpi-card">
+                    <span class="kpi-value">{{ selectedHospital?.availableBeds }}<small>/{{ selectedHospital?.totalBeds }}</small></span>
+                    <span class="kpi-label">General Beds</span>
+                  </div>
+                  <div class="kpi-card kpi-warn">
+                    <span class="kpi-value">{{ selectedHospital?.availableIcuBeds }}<small>/{{ selectedHospital?.totalIcuBeds }}</small></span>
+                    <span class="kpi-label">ICU Beds</span>
+                  </div>
+                  <div class="kpi-card">
+                    <span class="kpi-value">{{ selectedHospital?.availableEmergencyBeds }}<small>/{{ selectedHospital?.totalEmergencyBeds }}</small></span>
+                    <span class="kpi-label">Emergency Beds</span>
+                  </div>
+                  <div class="kpi-card">
+                    <span class="kpi-value">{{ waitingQueueCount }}</span>
+                    <span class="kpi-label">Patients Waiting</span>
+                  </div>
+                }
               </div>
-              <div class="kpi-card kpi-warn">
-                <span class="kpi-value">{{ selectedHospital?.availableIcuBeds }}<small>/{{ selectedHospital?.totalIcuBeds }}</small></span>
-                <span class="kpi-label">ICU Beds</span>
-              </div>
-              <div class="kpi-card">
-                <span class="kpi-value">{{ selectedHospital?.availableEmergencyBeds }}<small>/{{ selectedHospital?.totalEmergencyBeds }}</small></span>
-                <span class="kpi-label">Emergency Beds</span>
-              </div>
-              <div class="kpi-card">
-                <span class="kpi-value">{{ waitingQueueCount }}</span>
-                <span class="kpi-label">Patients Waiting</span>
+              <div class="chart-container" style="width: 250px; height: 250px; flex-shrink: 0; display: flex; justify-content: center; align-items: center; position: relative;">
+                @if (isLoading) {
+                  <div class="skeleton-box" style="width: 200px; height: 200px; border-radius: 50%;"></div>
+                } @else {
+                  <canvas id="occupancyChart"></canvas>
+                }
               </div>
             </div>
           </div>
         </section>
 
-        <section class="panel full-panel">
+        <section class="panel panel-admin full-panel">
           <div class="panel-header">
             <h2>Ward &amp; Bed Status Matrix</h2>
           </div>
@@ -394,45 +584,70 @@
     <!-- CITY COMMAND CENTER -->
     @if (userRole === 'CITY_ADMIN') {
       <div class="city-layout">
-        <section class="panel full-panel">
+        <section class="panel panel-city full-panel">
           <div class="panel-header">
             <h2>City-Wide Resource Summary</h2>
           </div>
           <div class="panel-body">
             <div class="summary-row">
-              <div class="summary-tile">
-                <span class="sum-value">{{ hospitals.length }}</span>
-                <span class="sum-label">Monitored Facilities</span>
-              </div>
-              <div class="summary-tile">
-                <span class="sum-value">{{ totalCityAvailableBeds }} / {{ totalCityBeds }}</span>
-                <span class="sum-label">Available Beds City-Wide</span>
-              </div>
-              <div class="summary-tile" [class.sum-alert]="totalCityIcuAvailable < 5">
-                <span class="sum-value">{{ totalCityIcuAvailable }}</span>
-                <span class="sum-label">ICU Beds Available</span>
-              </div>
+              @if (isLoading) {
+                <div class="summary-tile skeleton-box" style="height: 60px;"></div>
+                <div class="summary-tile skeleton-box" style="height: 60px;"></div>
+                <div class="summary-tile skeleton-box" style="height: 60px;"></div>
+              } @else {
+                <div class="summary-tile">
+                  <span class="sum-value">{{ hospitals.length }}</span>
+                  <span class="sum-label">Monitored Facilities</span>
+                </div>
+                <div class="summary-tile">
+                  <span class="sum-value">{{ totalCityAvailableBeds }} / {{ totalCityBeds }}</span>
+                  <span class="sum-label">Available Beds City-Wide</span>
+                </div>
+                <div class="summary-tile" [class.sum-alert]="totalCityIcuAvailable < 5">
+                  <span class="sum-value">{{ totalCityIcuAvailable }}</span>
+                  <span class="sum-label">ICU Beds Available</span>
+                </div>
+              }
             </div>
           </div>
         </section>
 
-        <section class="panel full-panel">
+        <section class="panel panel-city full-panel">
           <div class="panel-header">
             <h2>Facility Status Overview</h2>
           </div>
           <div class="panel-body">
             <div class="facility-grid">
-              @for (h of hospitals; track h.id) {
-                <div class="facility-card" [class.facility-critical]="h.status === 'CRITICAL'" [class.facility-high]="h.status === 'HIGH_OCCUPANCY'">
-                  <div class="fac-name">{{ h.name }}</div>
-                  <div class="fac-address">{{ h.address }}</div>
-                  <div class="fac-stats">
-                    <span>Total: <strong>{{ h.totalBeds }}</strong></span>
-                    <span>Available: <strong>{{ h.availableBeds }}</strong></span>
-                    <span>ICU: <strong>{{ h.availableIcuBeds }}/{{ h.totalIcuBeds }}</strong></span>
+              @if (isLoading) {
+                @for (i of [1, 2, 3, 4]; track i) {
+                  <div class="facility-card skeleton-box" style="height: 120px;"></div>
+                }
+              } @else {
+                @for (h of hospitals; track h.id) {
+                  <div class="facility-card" [class.facility-critical]="h.status === 'CRITICAL'" [class.facility-high]="h.status === 'HIGH_OCCUPANCY'">
+                    <div class="fac-name">{{ h.name }}</div>
+                    <div class="fac-address">{{ h.address }}</div>
+                    <div class="fac-stats">
+                      <span>Total: <strong>{{ h.totalBeds }}</strong></span>
+                      <span>Available: <strong>{{ h.availableBeds }}</strong></span>
+                      <span>ICU: <strong>{{ h.availableIcuBeds }}/{{ h.totalIcuBeds }}</strong></span>
+                    </div>
+                    <div style="margin-top: 12px; font-size: 0.8rem;">
+                      <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span>Occupancy</span>
+                        <span>{{ h.totalBeds ? (((h.totalBeds - h.availableBeds) / h.totalBeds) * 100).toFixed(0) : 0 }}%</span>
+                      </div>
+                      <div style="background: var(--border-color); height: 8px; border-radius: 4px; overflow: hidden; position: relative;">
+                        <div style="background: var(--primary-color); height: 100%; transition: width 0.5s ease;" [style.width]="(h.totalBeds ? (((h.totalBeds - h.availableBeds) / h.totalBeds) * 100) : 0) + '%'" [style.background]="(h.totalBeds && ((h.totalBeds - h.availableBeds) / h.totalBeds) > 0.9) ? 'var(--danger-color)' : ((h.totalBeds && ((h.totalBeds - h.availableBeds) / h.totalBeds) > 0.75) ? '#f59e0b' : 'var(--primary-color)')"></div>
+                      </div>
+                      <div style="margin-top: 6px; text-align: right; color: var(--text-secondary); font-size: 0.75rem;">
+                        <svg style="width: 12px; height: 12px; vertical-align: middle; margin-right: 2px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                        +2% since yesterday
+                      </div>
+                    </div>
+                    <span class="tag" [class.tag-critical]="h.status === 'CRITICAL'" [class.tag-warn]="h.status === 'HIGH_OCCUPANCY'" [class.tag-ok]="h.status === 'NORMAL'" style="margin-top: 8px; display: inline-block;">{{ h.status }}</span>
                   </div>
-                  <span class="tag" [class.tag-critical]="h.status === 'CRITICAL'" [class.tag-warn]="h.status === 'HIGH_OCCUPANCY'" [class.tag-ok]="h.status === 'NORMAL'">{{ h.status }}</span>
-                </div>
+                }
               }
             </div>
           </div>
@@ -444,7 +659,7 @@
           </div>
           <div class="panel-body">
             <div class="table-wrap">
-              <table>
+              <table class="queue-table">
                 <thead>
                   <tr>
                     <th>ID</th>
@@ -456,23 +671,44 @@
                   </tr>
                 </thead>
                 <tbody>
-                  @for (tr of transfers; track tr.id) {
-                    <tr>
-                      <td>#{{ tr.id }}</td>
-                      <td>{{ tr.patientName }}</td>
-                      <td><span class="tag">{{ tr.requiredBedType }}</span></td>
-                      <td><span class="tag tag-critical">{{ tr.urgency }}</span></td>
-                      <td><span class="status-chip" [ngClass]="getStatusClass(tr.status)">{{ tr.status }}</span></td>
-                      <td class="cell-actions">
-                        @if (tr.status === 'PENDING') {
-                          <button class="btn-sm btn-done" (click)="acceptTransfer(tr.id)">Accept &amp; Reserve</button>
-                          <button class="btn-sm btn-danger" (click)="rejectTransfer(tr.id)">Reject</button>
-                        }
-                      </td>
-                    </tr>
-                  }
-                  @if (transfers.length === 0) {
-                    <tr><td colspan="6" class="empty-cell">No active transfers</td></tr>
+                  @if (isLoading) {
+                    @for (i of [1, 2, 3]; track i) {
+                      <tr class="skeleton-box" style="height: 60px; margin-bottom: 8px;">
+                        <td colspan="6"></td>
+                      </tr>
+                    }
+                  } @else {
+                    @for (tr of transfers; track tr.id) {
+                      <tr>
+                        <td data-label="ID">#{{ tr.id }}</td>
+                        <td data-label="Patient">{{ tr.patientName }}</td>
+                        <td data-label="Bed Type"><span class="tag">{{ tr.requiredBedType }}</span></td>
+                        <td data-label="Urgency">
+                          <span class="tag" [class.tag-critical]="tr.urgency === 'CRITICAL'" [class.tag-warn]="tr.urgency === 'HIGH'" [class.tag-ok]="tr.urgency === 'NORMAL'">
+                            @if (tr.urgency === 'CRITICAL') { 🚨 }
+                            @if (tr.urgency === 'HIGH') { ⚠️ }
+                            {{ tr.urgency }}
+                          </span>
+                        </td>
+                        <td data-label="Status"><span class="status-chip">{{ tr.status }}</span></td>
+                        <td data-label="Actions" class="cell-actions">
+                          @if (tr.status === 'PENDING') {
+                            <button class="btn-sm btn-done" (click)="acceptTransfer(tr.id)">Accept</button>
+                            <button class="btn-sm btn-danger" (click)="rejectTransfer(tr.id)">Reject</button>
+                          }
+                        </td>
+                      </tr>
+                    }
+                    @if (transfers.length === 0) {
+                      <tr>
+                        <td colspan="6" style="padding: 32px 0;">
+                          <div class="empty-state">
+                            <p class="empty-title">No Active Transfers</p>
+                            <p class="empty-desc">There are currently no inbound or outbound transfer requests.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    }
                   }
                 </tbody>
               </table>
@@ -629,7 +865,7 @@
                 <div class="rec-row">
                   <div class="rec-main">
                     <strong>{{ r.visitDate | date:'medium' }}</strong>
-                    <span class="rec-badge">Dr. {{ r.doctorName || 'Unknown' }}</span>
+                    <span class="rec-badge">{{ r.doctorName || 'Unknown' }}</span>
                   </div>
                   <dl class="token-details">
                     @if (r.symptoms) { <dt>Symptoms</dt><dd>{{ r.symptoms }}</dd> }
@@ -685,14 +921,122 @@
 
             <label>Weight (kg)</label>
             <input type="number" step="0.1" [(ngModel)]="recordForm.weightKg">
+
+            <label>Follow-up Date (Optional)</label>
+            <input type="date" [(ngModel)]="recordForm.followUpDate">
           </div>
+          @if (recordError) {
+            <div class="alert-banner alert-danger" style="margin-top: 16px;">{{ recordError }}</div>
+          }
         </div>
         <div class="modal-footer">
           <button class="btn-secondary" (click)="closeRecordModal()">Cancel</button>
-          <button class="btn-primary" (click)="submitConsultationRecord()">Save &amp; Mark Completed</button>
+          <button class="btn-primary" (click)="submitConsultationRecord()" [disabled]="recordSaving">
+            {{ recordSaving ? 'Saving...' : 'Save & Mark Completed' }}
+          </button>
         </div>
       </div>
     </div>
   }
 
+  <!-- ONBOARD DOCTOR MODAL (admin view) -->
+  @if (showAddDoctorModal) {
+    <div class="overlay" (click)="closeAddDoctorModal()">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-top">
+          <h3>Onboard New Doctor</h3>
+          <button class="close-x" (click)="closeAddDoctorModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          @if (addDoctorError) {
+            <div class="alert-banner alert-danger">{{ addDoctorError }}</div>
+          }
+          @if (addDoctorSuccessMessage) {
+            <div class="alert-banner" style="background: #e6f4ea; color: #1e8e3e; border: 1px solid #ceead6;">
+              {{ addDoctorSuccessMessage }}
+            </div>
+          }
+          <div class="form-grid">
+            <label>Name</label>
+            <input type="text" [(ngModel)]="newDoctorForm.name" placeholder="Dr. John Doe">
+
+            <label>Email Address</label>
+            <input type="email" [(ngModel)]="newDoctorForm.email" placeholder="john.doe@hospital.com">
+            
+            <label>Phone Number</label>
+            <input type="tel" maxlength="10" [(ngModel)]="newDoctorForm.phone" placeholder="9811122233">
+
+            <label>Department</label>
+            <select [(ngModel)]="newDoctorForm.departmentId">
+              @for (d of departments; track d.id) {
+                <option [value]="d.id">{{ d.name }}</option>
+              }
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="closeAddDoctorModal()">Cancel</button>
+          <button class="btn-primary" (click)="submitAddDoctor()" [disabled]="addDoctorLoading">
+            {{ addDoctorLoading ? 'Onboarding...' : 'Onboard Doctor' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+  <!-- MANAGE DOCTOR AVAILABILITY MODAL -->
+  @if (showAvailabilityModal) {
+    <div class="overlay" (click)="showAvailabilityModal = false">
+      <div class="modal modal-wide" (click)="$event.stopPropagation()">
+        <div class="modal-top">
+          <h3>Manage Doctor Availability</h3>
+          <button class="close-x" (click)="showAvailabilityModal = false">&times;</button>
+        </div>
+        <div class="modal-body">
+          @if (availabilityLoading) {
+            <p>Loading...</p>
+          } @else {
+            <p class="subtitle" style="margin-bottom: 16px;">Set up recurring weekly availability slots.</p>
+            <table class="queue-table" style="margin-bottom: 16px;">
+              <thead>
+                <tr>
+                  <th>Day of Week</th>
+                  <th>Start Time</th>
+                  <th>End Time</th>
+                  <th>Slot Duration (min)</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of availabilityForm; track $index) {
+                  <tr>
+                    <td data-label="Day of Week">
+                      <select [(ngModel)]="row.dayOfWeek" style="width: 120px;">
+                        @for (day of daysOfWeek; track day) {
+                          <option [value]="day">{{ day }}</option>
+                        }
+                      </select>
+                    </td>
+                    <td data-label="Start Time"><input type="time" [(ngModel)]="row.startTime"></td>
+                    <td data-label="End Time"><input type="time" [(ngModel)]="row.endTime"></td>
+                    <td data-label="Slot Duration"><input type="number" [(ngModel)]="row.slotDurationMinutes" style="width: 60px;"></td>
+                    <td data-label="Actions"><button class="btn-danger" style="padding: 4px 8px; font-size: 0.8rem;" (click)="removeAvailabilityRow($index)">Remove</button></td>
+                  </tr>
+                }
+                @if (availabilityForm.length === 0) {
+                  <tr>
+                    <td colspan="5" style="text-align: center; padding: 12px; color: var(--text-secondary);">No availability defined. Doctor is currently unavailable.</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+            <button class="btn-secondary" (click)="addAvailabilityRow()">+ Add Slot</button>
+          }
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="showAvailabilityModal = false">Cancel</button>
+          <button class="btn-primary" (click)="saveAvailability()" [disabled]="availabilityLoading">Save Changes</button>
+        </div>
+      </div>
+    </div>
+  }
 </div>

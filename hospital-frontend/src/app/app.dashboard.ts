@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService } from './services/api.service';
+import { SupabaseService } from './services/supabase.service';
+import { Chart } from 'chart.js/auto';
 
 @Component({
   selector: 'app-dashboard',
@@ -20,8 +22,10 @@ export class DashboardComponent implements OnInit {
 
   hospitals: any[] = [];
   selectedHospital: any = null;
+  occupancyChart: Chart | null = null;
   departments: any[] = [];
   doctors: any[] = [];
+  wards: any[] = [];
   beds: any[] = [];
   queue: any[] = [];
   transfers: any[] = [];
@@ -30,19 +34,49 @@ export class DashboardComponent implements OnInit {
   // Patient Booking Form
   patientView: string = 'DASHBOARD';
   patientTokens: any[] = [];
+  patientScheduledAppointments: any[] = [];
   patientHistoryRecords: any[] = [];
+  bookingForMode: string = 'MYSELF';
   bookingForm = {
     patientName: '',
     patientPhone: '',
     departmentId: null as number | null,
     doctorId: null as number | null,
-    priority: 'NORMAL'
+    priority: 'NORMAL',
+    bookingMode: 'WALK_IN', // 'WALK_IN' or 'SCHEDULED'
+    slotStart: null as string | null
   };
+  availableSlots: any[] = [];
+  slotsLoading: boolean = false;
+  
+  // Calendar State
+  currentDate = new Date();
+  calendarMonth: number = this.currentDate.getMonth() + 1;
+  calendarYear: number = this.currentDate.getFullYear();
+  calendarDays: { date: Date, dateStr: string, hasAvailability: boolean, isPast: boolean }[] = [];
+  selectedDateStr: string | null = null;
+  calendarLoading: boolean = false;
+  
+  // Doctor Availability Management
+  showAvailabilityModal: boolean = false;
+  availabilityLoading: boolean = false;
+  availabilityForm: any[] = [];
+  daysOfWeek = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+
+  // Bed Search Form
+  bedSearchType: string = 'GENERAL';
+  bedSearchResults: any[] = [];
+  bedSearchLoading: boolean = false;
   latestToken: any = null;
+  isLoading: boolean = true;
 
   // Doctor Workstation
   currentDoctorId: number = 1;
   selectedDoctor: any = null;
+
+  // Department Drill-down
+  selectedDepartmentForView: any = null;
+  departmentDoctorsForView: any[] = [];
 
   // Transfer Modal
   showTransferModal: boolean = false;
@@ -82,10 +116,25 @@ export class DashboardComponent implements OnInit {
     bloodPressure: '',
     temperatureCelsius: null as number | null,
     pulseRate: null as number | null,
-    weightKg: null as number | null
+    weightKg: null as number | null,
+    followUpDate: ''
+  };
+  recordError: string | null = null;
+  recordSaving: boolean = false;
+
+  // Add Doctor Modal
+  showAddDoctorModal: boolean = false;
+  addDoctorLoading: boolean = false;
+  addDoctorError: string | null = null;
+  addDoctorSuccessMessage: string | null = null;
+  newDoctorForm = {
+    name: '',
+    email: '',
+    phone: '',
+    departmentId: null as number | null
   };
 
-  constructor(private apiService: ApiService, private cdr: ChangeDetectorRef, private router: Router) {}
+  constructor(private apiService: ApiService, private cdr: ChangeDetectorRef, private router: Router, private supabaseService: SupabaseService) {}
 
   ngOnInit(): void {
     // Read user from localStorage
@@ -119,7 +168,8 @@ export class DashboardComponent implements OnInit {
     this.loadTransfers();
   }
 
-  logout(): void {
+  async logout(): Promise<void> {
+    await this.supabaseService.signOut();
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
     this.router.navigate(['/login']);
@@ -132,23 +182,66 @@ export class DashboardComponent implements OnInit {
         if (this.hospitals.length > 0) {
           this.onHospitalSelect(this.selectedHospitalId);
         }
+        this.isLoading = false;
         this.cdr.markForCheck();
       },
-      error: (err) => console.error('Failed to load hospitals', err)
+      error: (err) => {
+        console.error('Failed to load hospitals', err);
+        this.isLoading = false;
+        this.cdr.markForCheck();
+      }
     });
   }
 
   loadPatientData(): void {
-    if (this.currentUser && this.currentUser.phone) {
-      this.apiService.getPatientQueue(this.currentUser.phone).subscribe(data => {
+    if (this.currentUser && this.currentUser.phone && this.currentUser.name) {
+      this.apiService.getPatientQueueByPhoneAndName(this.currentUser.phone, this.currentUser.name).subscribe(data => {
         this.patientTokens = data.sort((a, b) => b.id - a.id);
         this.cdr.markForCheck();
       });
-      this.apiService.getPatientHistoryByPhone(this.currentUser.phone).subscribe(data => {
-        this.patientHistoryRecords = data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      this.apiService.getPatientAppointmentsByPhoneAndName(this.currentUser.phone, this.currentUser.name).subscribe(data => {
+        this.patientScheduledAppointments = data.sort((a, b) => new Date(a.appointmentTime).getTime() - new Date(b.appointmentTime).getTime());
+        // 2. Fetch Medical History (Consultations)
+        if (this.currentUser.phone && this.currentUser.name) {
+          this.apiService.getPatientHistoryByPhoneAndName(this.currentUser.phone, this.currentUser.name).subscribe(data => {
+            this.patientHistoryRecords = data.sort((a, b) => new Date(b.visitDate).getTime() - new Date(a.visitDate).getTime());
+          });
+        }
         this.cdr.markForCheck();
       });
     }
+  }
+
+  loadHospitalData(): void {
+    if (!this.selectedHospitalId) return;
+    this.isLoading = true;
+
+    this.apiService.getHospitalById(this.selectedHospitalId).subscribe(data => {
+      this.selectedHospital = data;
+      this.cdr.markForCheck();
+    });
+
+    this.apiService.getHospitalQueue(this.selectedHospitalId).subscribe(data => {
+      this.queue = data;
+      this.cdr.markForCheck();
+    });
+
+    this.apiService.getWards(this.selectedHospitalId).subscribe(data => {
+      this.wards = data;
+      this.cdr.markForCheck();
+    });
+
+    this.apiService.getTransfersForHospital(this.selectedHospitalId).subscribe(data => {
+      this.transfers = data;
+      this.cdr.markForCheck();
+    });
+
+    this.apiService.getAdmissions(this.selectedHospitalId).subscribe(data => {
+      this.admissions = data;
+      this.isLoading = false;
+      this.cdr.markForCheck();
+      this.renderChart();
+    });
   }
 
   onHospitalSelect(hospitalId: number): void {
@@ -156,12 +249,48 @@ export class DashboardComponent implements OnInit {
     this.apiService.getHospitalById(this.selectedHospitalId).subscribe(h => {
       this.selectedHospital = h;
       this.cdr.markForCheck();
+      this.renderChart();
     });
     this.loadDepartments(this.selectedHospitalId);
     this.loadDoctors(this.selectedHospitalId);
     this.loadBeds(this.selectedHospitalId);
     this.refreshQueue();
     this.loadAdmissions(this.selectedHospitalId);
+  }
+
+  renderChart(): void {
+    if (!this.selectedHospital || this.userRole !== 'HOSPITAL_ADMIN') return;
+    setTimeout(() => {
+      const canvas = document.getElementById('occupancyChart') as HTMLCanvasElement;
+      if (!canvas) return;
+      
+      if (this.occupancyChart) {
+        this.occupancyChart.destroy();
+      }
+
+      const totalOccupied = (this.selectedHospital.totalBeds || 0) - (this.selectedHospital.availableBeds || 0);
+      const available = this.selectedHospital.availableBeds || 0;
+
+      this.occupancyChart = new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+          labels: ['Occupied', 'Available'],
+          datasets: [{
+            data: [totalOccupied, available],
+            backgroundColor: ['#f43f5e', '#10b981'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '70%',
+          plugins: {
+            legend: { position: 'bottom' }
+          }
+        }
+      });
+    }, 150);
   }
 
   loadDepartments(hospitalId: number): void {
@@ -222,6 +351,21 @@ export class DashboardComponent implements OnInit {
     });
   }
 
+  searchBeds(): void {
+    this.bedSearchLoading = true;
+    this.apiService.getHospitalRecommendations(null, this.bedSearchType).subscribe({
+      next: (data) => {
+        this.bedSearchResults = data;
+        this.bedSearchLoading = false;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.bedSearchLoading = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
   loadTransfers(): void {
     this.apiService.getAllTransfers().subscribe(data => {
       this.transfers = data;
@@ -231,7 +375,7 @@ export class DashboardComponent implements OnInit {
 
   onDepartmentChange(): void {
     if (this.bookingForm.departmentId) {
-      this.apiService.getDoctors(this.selectedHospitalId, this.bookingForm.departmentId).subscribe(docs => {
+      this.apiService.getDoctors(this.selectedHospitalId, this.bookingForm.departmentId ?? undefined).subscribe(docs => {
         this.doctors = docs;
         if (docs.length > 0) this.bookingForm.doctorId = docs[0].id;
         this.cdr.markForCheck();
@@ -239,10 +383,45 @@ export class DashboardComponent implements OnInit {
     }
   }
 
+  viewDepartmentDoctors(dept: any): void {
+    this.selectedDepartmentForView = dept;
+    this.departmentDoctorsForView = [];
+    this.apiService.getDoctors(this.selectedHospitalId, dept.id).subscribe(docs => {
+      this.departmentDoctorsForView = docs;
+      this.cdr.markForCheck();
+    });
+  }
+
+  bookFromDepartment(doc: any): void {
+    if (this.selectedDepartmentForView) {
+      this.bookingForm.departmentId = this.selectedDepartmentForView.id;
+      this.patientView = 'APPOINTMENT';
+      this.apiService.getDoctors(this.selectedHospitalId, this.selectedDepartmentForView.id).subscribe(docs => {
+        this.doctors = docs;
+        this.bookingForm.doctorId = doc.id;
+        this.cdr.markForCheck();
+      });
+    }
+  }
+
+  onBookingModeChange(): void {
+    if (this.bookingForMode === 'MYSELF') {
+      this.bookingForm.patientName = this.currentUser.name;
+    } else {
+      this.bookingForm.patientName = '';
+    }
+  }
+
+  formatDoctorName(name: string): string {
+    if (!name) return '';
+    let cleanName = name.replace(/^(Dr\.\s*)+/i, '');
+    return 'Dr. ' + cleanName;
+  }
+
   submitBooking(): void {
     if (!this.bookingForm.doctorId || !this.bookingForm.departmentId) return;
 
-    const payload = {
+    const payload: any = {
       patientId: this.currentUser.id,
       patientName: this.bookingForm.patientName,
       patientPhone: this.bookingForm.patientPhone,
@@ -253,17 +432,174 @@ export class DashboardComponent implements OnInit {
       bookingChannel: 'WEB'
     };
 
-    this.apiService.bookAppointment(payload).subscribe({
-      next: (token) => {
-        this.latestToken = token;
-        this.showToast(`Token ${token.tokenNumber} issued — estimated wait: ${token.estimatedWaitMinutes} min`);
-        this.loadQueue(this.selectedHospitalId);
-        if (this.userRole === 'PATIENT') {
-          this.loadPatientData();
+    if (this.bookingForm.bookingMode === 'SCHEDULED') {
+      if (!this.bookingForm.slotStart) {
+        this.showToast('Please select an available slot.');
+        return;
+      }
+      payload.slotStart = this.bookingForm.slotStart;
+      this.apiService.scheduleAppointment(payload).subscribe({
+        next: (appt) => {
+          this.showToast(`Appointment scheduled for ${new Date(appt.appointmentTime).toLocaleString()}`);
+          if (this.userRole === 'PATIENT') {
+            this.loadPatientData();
+          }
+          this.patientView = 'DASHBOARD';
+          this.cdr.markForCheck();
+        },
+        error: (err) => this.showToast('Scheduling failed: ' + (err.error?.message || err.message))
+      });
+    } else {
+      this.apiService.bookAppointment(payload).subscribe({
+        next: (token) => {
+          this.latestToken = token;
+          this.showToast(`Token ${token.tokenNumber} issued — estimated wait: ${token.estimatedWaitMinutes} min`);
+          this.loadQueue(this.selectedHospitalId);
+          if (this.userRole === 'PATIENT') {
+            this.loadPatientData();
+          }
+          this.cdr.markForCheck();
+        },
+        error: (err) => this.showToast('Booking failed: ' + (err.error?.message || err.message))
+      });
+    }
+  }
+
+  generateCalendar(): void {
+    if (!this.bookingForm.doctorId) return;
+    this.calendarLoading = true;
+    this.apiService.getDoctorAvailabilitySummary(this.bookingForm.doctorId, this.calendarMonth, this.calendarYear).subscribe({
+      next: (summary) => {
+        const firstDay = new Date(this.calendarYear, this.calendarMonth - 1, 1).getDay(); // 0-6
+        const daysInMonth = new Date(this.calendarYear, this.calendarMonth, 0).getDate();
+        
+        this.calendarDays = [];
+        
+        // Padding start
+        for (let i = 0; i < firstDay; i++) {
+          this.calendarDays.push(null as any);
         }
+        
+        // Days
+        for (let i = 1; i <= daysInMonth; i++) {
+          const dateStr = `${this.calendarYear}-${String(this.calendarMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+          const s = summary.find((x: any) => x.date === dateStr);
+          this.calendarDays.push({
+            date: new Date(this.calendarYear, this.calendarMonth - 1, i),
+            dateStr: dateStr,
+            hasAvailability: s ? s.hasAvailability : false,
+            isPast: new Date(dateStr) < new Date(new Date().toISOString().split('T')[0])
+          });
+        }
+        
+        this.calendarLoading = false;
         this.cdr.markForCheck();
       },
-      error: (err) => this.showToast('Booking failed: ' + (err.error?.message || err.message))
+      error: () => {
+        this.calendarLoading = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  changeMonth(offset: number): void {
+    let d = new Date(this.calendarYear, this.calendarMonth - 1 + offset, 1);
+    this.calendarMonth = d.getMonth() + 1;
+    this.calendarYear = d.getFullYear();
+    this.selectedDateStr = null;
+    this.availableSlots = [];
+    this.bookingForm.slotStart = null;
+    this.generateCalendar();
+  }
+
+  getCalendarMonthName(): string {
+    const d = new Date(this.calendarYear, this.calendarMonth - 1, 1);
+    return d.toLocaleString('default', { month: 'long', year: 'numeric' });
+  }
+
+  selectDate(day: any): void {
+    if (!day || day.isPast || !day.hasAvailability) return;
+    this.selectedDateStr = day.dateStr;
+    this.bookingForm.slotStart = null;
+    this.fetchSlotsForDate(day.dateStr);
+  }
+
+  fetchSlotsForDate(dateStr: string): void {
+    if (!this.bookingForm.doctorId) return;
+    this.slotsLoading = true;
+    this.apiService.getAvailableSlots(this.bookingForm.doctorId, dateStr, dateStr).subscribe({
+      next: (slots) => {
+        this.availableSlots = slots.filter(s => s.available);
+        this.slotsLoading = false;
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        this.slotsLoading = false;
+        this.showToast('Failed to load slots');
+      }
+    });
+  }
+
+  checkInScheduled(appointmentId: number): void {
+    this.apiService.checkInScheduledAppointment(appointmentId).subscribe({
+      next: (token) => {
+        this.showToast(`Checked in! Token ${token.tokenNumber} issued.`);
+        this.loadPatientData();
+      },
+      error: (err) => this.showToast('Check-in failed: ' + (err.error?.message || err.message))
+    });
+  }
+
+  openAvailabilityModal(): void {
+    if (this.userRole !== 'DOCTOR' && this.userRole !== 'HOSPITAL_ADMIN') return;
+    const docId = this.userRole === 'DOCTOR' ? this.currentDoctorId : this.selectedDoctor?.id;
+    if (!docId) return;
+    
+    this.availabilityLoading = true;
+    this.showAvailabilityModal = true;
+    this.apiService.getDoctorAvailability(docId).subscribe(data => {
+      this.availabilityForm = data;
+      this.availabilityLoading = false;
+      this.cdr.markForCheck();
+    });
+  }
+
+  addAvailabilityRow(): void {
+    this.availabilityForm.push({
+      dayOfWeek: 'MONDAY',
+      startTime: '09:00:00',
+      endTime: '17:00:00',
+      slotDurationMinutes: 15
+    });
+  }
+
+  removeAvailabilityRow(index: number): void {
+    this.availabilityForm.splice(index, 1);
+  }
+
+  saveAvailability(): void {
+    const docId = this.userRole === 'DOCTOR' ? this.currentDoctorId : this.selectedDoctor?.id;
+    if (!docId) return;
+    
+    this.availabilityLoading = true;
+    // ensure seconds are attached to HH:mm for java.time.LocalTime
+    const payload = this.availabilityForm.map(row => ({
+      ...row,
+      startTime: row.startTime.length === 5 ? row.startTime + ':00' : row.startTime,
+      endTime: row.endTime.length === 5 ? row.endTime + ':00' : row.endTime
+    }));
+    
+    this.apiService.saveDoctorAvailability(docId, payload).subscribe({
+      next: () => {
+        this.showToast('Availability saved successfully.');
+        this.showAvailabilityModal = false;
+        this.availabilityLoading = false;
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        this.showToast('Failed to save availability');
+        this.availabilityLoading = false;
+      }
     });
   }
 
@@ -281,9 +617,9 @@ export class DashboardComponent implements OnInit {
     this.historyLoading = true;
     this.showHistoryModal = true;
 
-    const lookup = item.patientId
-      ? this.apiService.getPatientHistory(item.patientId)
-      : this.apiService.getPatientHistoryByPhone(item.patientPhone);
+    const lookup = (item.patientPhone && item.patientName)
+      ? this.apiService.getPatientHistoryByPhoneAndName(item.patientPhone, item.patientName)
+      : this.apiService.getPatientHistory(item.patientId);
 
     lookup.subscribe({
       next: (records) => {
@@ -313,7 +649,8 @@ export class DashboardComponent implements OnInit {
       bloodPressure: '',
       temperatureCelsius: null,
       pulseRate: null,
-      weightKg: null
+      weightKg: null,
+      followUpDate: ''
     };
     this.showRecordModal = true;
   }
@@ -324,8 +661,10 @@ export class DashboardComponent implements OnInit {
   }
 
   submitConsultationRecord(): void {
-    if (!this.recordTargetItem) return;
+    if (!this.recordTargetItem || this.recordSaving) return;
     const item = this.recordTargetItem;
+    this.recordError = null;
+    this.recordSaving = true;
 
     const payload = {
       patientId: item.patientId ?? null,
@@ -342,7 +681,8 @@ export class DashboardComponent implements OnInit {
       bloodPressure: this.recordForm.bloodPressure,
       temperatureCelsius: this.recordForm.temperatureCelsius,
       pulseRate: this.recordForm.pulseRate,
-      weightKg: this.recordForm.weightKg
+      weightKg: this.recordForm.weightKg,
+      followUpDate: this.recordForm.followUpDate || null
     };
 
     this.apiService.createMedicalRecord(payload).subscribe({
@@ -351,12 +691,21 @@ export class DashboardComponent implements OnInit {
         // so a doctor can never lose a consultation's history by mis-clicking.
         this.apiService.updateQueueStatus(item.id, 'COMPLETED').subscribe(() => {
           this.showToast(`Consultation completed for ${item.patientName}`);
+          this.recordSaving = false;
           this.closeRecordModal();
           this.refreshQueue();
           this.cdr.markForCheck();
         });
       },
-      error: (err) => this.showToast('Could not save visit record: ' + (err.error?.message || err.message))
+      error: (err) => {
+        this.recordSaving = false;
+        if (err.status === 400) {
+          this.recordError = typeof err.error === 'string' ? err.error : (err.error?.message || 'Invalid input.');
+        } else {
+          this.recordError = 'Could not save visit record. Please try again.';
+        }
+        this.cdr.markForCheck();
+      }
     });
   }
 
@@ -491,6 +840,62 @@ export class DashboardComponent implements OnInit {
       this.notificationAlert = null;
       this.cdr.markForCheck();
     }, 4000);
+  }
+
+  // ── Onboard Doctor (admin view) ───────────────────────────────────────
+  openAddDoctorModal(): void {
+    this.showAddDoctorModal = true;
+    this.addDoctorError = null;
+    this.addDoctorSuccessMessage = null;
+    this.newDoctorForm = {
+      name: '',
+      email: '',
+      phone: '',
+      departmentId: this.departments.length > 0 ? this.departments[0].id : null
+    };
+  }
+
+  closeAddDoctorModal(): void {
+    this.showAddDoctorModal = false;
+  }
+
+  submitAddDoctor(): void {
+    if (!this.newDoctorForm.name || !this.newDoctorForm.email || !this.newDoctorForm.departmentId) {
+      this.addDoctorError = 'Please fill all required fields';
+      return;
+    }
+
+    this.addDoctorLoading = true;
+    this.addDoctorError = null;
+    this.addDoctorSuccessMessage = null;
+
+    const payload = {
+      name: this.newDoctorForm.name,
+      email: this.newDoctorForm.email,
+      phone: this.newDoctorForm.phone,
+      hospitalId: this.selectedHospitalId,
+      departmentId: this.newDoctorForm.departmentId,
+      specialization: 'General', // Default, can be updated later
+      password: 'ChangeMe123!' // Default password for new doctors
+    };
+
+    // Use ApiService to call POST /api/admin/onboard-doctor
+    this.apiService.onboardDoctor(payload).subscribe({
+      next: () => {
+        this.addDoctorLoading = false;
+        this.addDoctorSuccessMessage = 'Doctor successfully onboarded!';
+        this.loadDoctors(this.selectedHospitalId);
+        this.cdr.markForCheck();
+        setTimeout(() => {
+          this.closeAddDoctorModal();
+        }, 2000);
+      },
+      error: (err: any) => {
+        this.addDoctorLoading = false;
+        this.addDoctorError = err.error?.message || err.message || 'Failed to onboard doctor.';
+        this.cdr.markForCheck();
+      }
+    });
   }
 
   get roleBadge(): string {

@@ -5,13 +5,39 @@ import com.hospital.platform.repository.PatientRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.jdbc.core.JdbcTemplate;
+import jakarta.annotation.PostConstruct;
+
 @Service
 public class PatientService {
 
     private final PatientRepository patientRepository;
+    private final JdbcTemplate jdbcTemplate;
 
-    public PatientService(PatientRepository patientRepository) {
+    public PatientService(PatientRepository patientRepository, JdbcTemplate jdbcTemplate) {
         this.patientRepository = patientRepository;
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    @PostConstruct
+    public void dropUniquePhoneConstraint() {
+        try {
+            String sql = "DO $$ DECLARE constraint_name text; " +
+                    "BEGIN " +
+                    "SELECT conname INTO constraint_name " +
+                    "FROM pg_constraint " +
+                    "WHERE conrelid = 'patients'::regclass " +
+                    "AND contype = 'u' " +
+                    "AND conkey = (SELECT array_agg(attnum) FROM pg_attribute WHERE attrelid = 'patients'::regclass AND attname = 'phone'); " +
+                    "IF constraint_name IS NOT NULL THEN " +
+                    "EXECUTE 'ALTER TABLE patients DROP CONSTRAINT ' || constraint_name; " +
+                    "END IF; " +
+                    "END $$;";
+            jdbcTemplate.execute(sql);
+            System.out.println("Dropped unique constraint on patients.phone if it existed.");
+        } catch (Exception e) {
+            System.err.println("Could not drop unique constraint on patients.phone: " + e.getMessage());
+        }
     }
 
     /**
@@ -38,15 +64,12 @@ public class PatientService {
             return null;
         }
 
-        return patientRepository.findByPhone(phone)
-                .map(existing -> {
-                    // Keep the name reasonably fresh if it was blank/placeholder before.
-                    if (name != null && !name.isBlank() && !name.equals(existing.getName())) {
-                        existing.setName(name);
-                        patientRepository.save(existing);
-                    }
-                    return existing;
-                })
+        if (name == null || name.isBlank()) {
+            return patientRepository.findByPhone(phone)
+                    .orElseGet(() -> patientRepository.save(new Patient(name, phone)));
+        }
+
+        return patientRepository.findByNameIgnoreCaseAndPhone(name, phone)
                 .orElseGet(() -> patientRepository.save(new Patient(name, phone)));
     }
 

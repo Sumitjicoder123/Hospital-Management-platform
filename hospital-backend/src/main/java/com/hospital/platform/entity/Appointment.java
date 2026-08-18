@@ -37,7 +37,7 @@ public class Appointment {
     }
 
     public enum AppointmentStatus {
-        BOOKED, CHECKED_IN, IN_CONSULTATION, COMPLETED, CANCELLED
+        SCHEDULED, BOOKED, CHECKED_IN, IN_CONSULTATION, COMPLETED, CANCELLED
     }
 
     public Appointment() {}

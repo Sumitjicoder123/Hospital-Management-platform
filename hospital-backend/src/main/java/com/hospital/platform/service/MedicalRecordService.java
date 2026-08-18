@@ -74,7 +74,13 @@ public class MedicalRecordService {
      * purely through WhatsApp) — phone number is the only stable identifier.
      */
     public List<MedicalRecord> getHistoryByPhone(String phone) {
-        return medicalRecordRepository.findByPatientPhoneOrderByVisitDateDesc(phone);
+        String normalized = PatientService.normalizePhone(phone);
+        return medicalRecordRepository.findByPatientPhoneOrderByVisitDateDesc(normalized);
+    }
+
+    public List<MedicalRecord> getHistoryByPhoneAndName(String phone, String name) {
+        String normalized = PatientService.normalizePhone(phone);
+        return medicalRecordRepository.findByPatientPhoneAndPatientNameOrderByVisitDateDesc(normalized, name);
     }
 
     public List<MedicalRecord> getHospitalRecords(Long hospitalId) {

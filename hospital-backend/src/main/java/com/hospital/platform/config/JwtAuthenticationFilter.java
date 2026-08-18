@@ -41,12 +41,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = authHeader.substring(7);
             if (jwtUtils.validateToken(token)) {
                 String email = jwtUtils.getEmailFromToken(token);
-                userRepository.findByEmail(email).ifPresent(user -> {
+                if (email != null && !email.isEmpty()) {
+                    User user = userRepository.findByEmail(email).orElseGet(() -> {
+                        // Auto-create user from Supabase Google Auth login
+                        User newUser = new User(email, email, "supabase-auth-placeholder", "", com.hospital.platform.entity.Role.PATIENT, null, null);
+                        return userRepository.save(newUser);
+                    });
+                    
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                             user, null, Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
                     );
                     SecurityContextHolder.getContext().setAuthentication(authentication);
-                });
+                }
             }
         }
         

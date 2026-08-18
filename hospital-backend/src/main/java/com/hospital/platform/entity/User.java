@@ -11,16 +11,29 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String name;
 
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String password;
 
     private String phone;
+    
+    @Column(unique = true)
+    private String googleId;
+    
+    private String gender;
+    
+    @Column(columnDefinition = "TEXT")
+    private String address;
+    
+    private String profilePicture;
+    
+    @Column(nullable = false, columnDefinition = "boolean default false not null")
+    private boolean profileCompleted = false;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -43,6 +56,7 @@ public class User {
         this.phone = phone;
         this.role = role;
         this.hospitalId = hospitalId;
+        this.profileCompleted = true; // Pre-seeded and manually registered users are completed by default
     }
 
     public User(String name, String email, String password, String phone, Role role, Long hospitalId, Long doctorId) {
@@ -76,4 +90,19 @@ public class User {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public String getGoogleId() { return googleId; }
+    public void setGoogleId(String googleId) { this.googleId = googleId; }
+
+    public String getGender() { return gender; }
+    public void setGender(String gender) { this.gender = gender; }
+
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
+
+    public String getProfilePicture() { return profilePicture; }
+    public void setProfilePicture(String profilePicture) { this.profilePicture = profilePicture; }
+
+    public boolean isProfileCompleted() { return profileCompleted; }
+    public void setProfileCompleted(boolean profileCompleted) { this.profileCompleted = profileCompleted; }
 }

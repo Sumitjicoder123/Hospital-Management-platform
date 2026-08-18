@@ -259,4 +259,62 @@ public class OperationDTOs {
         public String getMessageBody() { return messageBody; }
         public void setMessageBody(String messageBody) { this.messageBody = messageBody; }
     }
+
+    public static class DoctorAvailabilityRequest {
+        private java.time.DayOfWeek dayOfWeek;
+        private java.time.LocalTime startTime;
+        private java.time.LocalTime endTime;
+        private Integer slotDurationMinutes;
+
+        public java.time.DayOfWeek getDayOfWeek() { return dayOfWeek; }
+        public void setDayOfWeek(java.time.DayOfWeek dayOfWeek) { this.dayOfWeek = dayOfWeek; }
+        public java.time.LocalTime getStartTime() { return startTime; }
+        public void setStartTime(java.time.LocalTime startTime) { this.startTime = startTime; }
+        public java.time.LocalTime getEndTime() { return endTime; }
+        public void setEndTime(java.time.LocalTime endTime) { this.endTime = endTime; }
+        public Integer getSlotDurationMinutes() { return slotDurationMinutes; }
+        public void setSlotDurationMinutes(Integer slotDurationMinutes) { this.slotDurationMinutes = slotDurationMinutes; }
+    }
+
+    public static class AvailableSlotResponse {
+        private java.time.LocalDateTime slotStart;
+        private java.time.LocalDateTime slotEnd;
+        private boolean available;
+
+        public AvailableSlotResponse() {}
+        public AvailableSlotResponse(java.time.LocalDateTime slotStart, java.time.LocalDateTime slotEnd, boolean available) {
+            this.slotStart = slotStart;
+            this.slotEnd = slotEnd;
+            this.available = available;
+        }
+
+        public java.time.LocalDateTime getSlotStart() { return slotStart; }
+        public void setSlotStart(java.time.LocalDateTime slotStart) { this.slotStart = slotStart; }
+        public java.time.LocalDateTime getSlotEnd() { return slotEnd; }
+        public void setSlotEnd(java.time.LocalDateTime slotEnd) { this.slotEnd = slotEnd; }
+        public boolean isAvailable() { return available; }
+        public void setAvailable(boolean available) { this.available = available; }
+    }
+
+    public static class ScheduledAppointmentRequest extends AppointmentBookingRequest {
+        private java.time.LocalDateTime slotStart;
+        public java.time.LocalDateTime getSlotStart() { return slotStart; }
+        public void setSlotStart(java.time.LocalDateTime slotStart) { this.slotStart = slotStart; }
+    }
+
+    public static class AvailabilitySummaryResponse {
+        private java.time.LocalDate date;
+        private boolean hasAvailability;
+
+        public AvailabilitySummaryResponse() {}
+        public AvailabilitySummaryResponse(java.time.LocalDate date, boolean hasAvailability) {
+            this.date = date;
+            this.hasAvailability = hasAvailability;
+        }
+
+        public java.time.LocalDate getDate() { return date; }
+        public void setDate(java.time.LocalDate date) { this.date = date; }
+        public boolean isHasAvailability() { return hasAvailability; }
+        public void setHasAvailability(boolean hasAvailability) { this.hasAvailability = hasAvailability; }
+    }
 }

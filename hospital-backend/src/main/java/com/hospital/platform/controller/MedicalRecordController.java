@@ -32,7 +32,10 @@ public class MedicalRecordController {
 
     // Fallback for walk-in / WhatsApp-only patients with no account.
     @GetMapping("/phone/{phone}")
-    public ResponseEntity<List<MedicalRecord>> getByPhone(@PathVariable String phone) {
+    public ResponseEntity<List<MedicalRecord>> getByPhone(@PathVariable String phone, @RequestParam(required = false) String name) {
+        if (name != null && !name.isBlank()) {
+            return ResponseEntity.ok(medicalRecordService.getHistoryByPhoneAndName(phone, name));
+        }
         return ResponseEntity.ok(medicalRecordService.getHistoryByPhone(phone));
     }
 
@@ -44,5 +47,10 @@ public class MedicalRecordController {
     @GetMapping("/{id}")
     public ResponseEntity<MedicalRecord> getById(@PathVariable Long id) {
         return ResponseEntity.ok(medicalRecordService.getById(id));
+    }
+
+    @ExceptionHandler(java.time.format.DateTimeParseException.class)
+    public ResponseEntity<String> handleDateTimeParseException(java.time.format.DateTimeParseException ex) {
+        return ResponseEntity.badRequest().body("Invalid date format for follow-up date. Please use YYYY-MM-DD.");
     }
 }

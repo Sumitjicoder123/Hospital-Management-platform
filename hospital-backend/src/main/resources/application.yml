@@ -8,13 +8,13 @@ spring:
     name: hospital-backend
 
   datasource:
-    url: jdbc:mysql://localhost:3306/hospitaldb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    username: root
-    password: sumit
+    url: jdbc:postgresql://aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require&prepareThreshold=0
+    driver-class-name: org.postgresql.Driver
+    username: postgres.lvaymongduklhaaklomk
+    password: SumitDubey@1234
 
   jpa:
-    database-platform: org.hibernate.dialect.MySQLDialect
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: update
     show-sql: false
@@ -23,7 +23,7 @@ spring:
         format_sql: true
 
 jwt:
-  secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+  secret: ${JWT_SECRET:YOUR_SUPABASE_JWT_SECRET}
   expirationMs: 86400000
 
 # WhatsApp Cloud API (Meta) - OPD booking via WhatsApp.
@@ -35,6 +35,11 @@ whatsapp:
   phone-number-id: ""
   verify-token: "demo-verify-token"
   api-version: v20.0
+
+supabase:
+  url: "https://lvaymongduklhaaklomk.supabase.co"
+  service-role-key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2YXltb25nZHVrbGhhYWtsb21rIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Njk2OTYwMCwiZXhwIjoyMTAyNTQ1NjAwfQ.zCmGOu_-zk1p0RkHLs21E5R6MYV8I1AHONIo6i6SKvg"
+  anon-key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2YXltb25nZHVrbGhhYWtsb21rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5Njk2MDAsImV4cCI6MjEwMjU0NTYwMH0.LxJ7Xwi_McjdFo-769Lc7QotSijaPWtkHrPLhT3YUdE"
 
 logging:
   level:

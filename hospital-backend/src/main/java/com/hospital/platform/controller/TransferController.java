@@ -33,7 +33,7 @@ public class TransferController {
     }
 
     @GetMapping("/recommend")
-    public ResponseEntity<List<HospitalMatchScoreDTO>> getRecommendations(@RequestParam Long sourceHospitalId,
+    public ResponseEntity<List<HospitalMatchScoreDTO>> getRecommendations(@RequestParam(required = false) Long sourceHospitalId,
                                                                           @RequestParam Ward.BedType requiredBedType) {
         return ResponseEntity.ok(recommendationService.findAndRankHospitals(sourceHospitalId, requiredBedType));
     }

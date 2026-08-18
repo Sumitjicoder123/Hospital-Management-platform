@@ -33,6 +33,8 @@ public class QueueEntry {
 
     private Integer estimatedWaitMinutes = 0;
 
+    private LocalDateTime expectedConsultTime;
+
     public enum Priority {
         EMERGENCY, CRITICAL, HIGH, NORMAL, ROUTINE
     }
@@ -88,4 +90,7 @@ public class QueueEntry {
 
     public Integer getEstimatedWaitMinutes() { return estimatedWaitMinutes; }
     public void setEstimatedWaitMinutes(Integer estimatedWaitMinutes) { this.estimatedWaitMinutes = estimatedWaitMinutes; }
+
+    public LocalDateTime getExpectedConsultTime() { return expectedConsultTime; }
+    public void setExpectedConsultTime(LocalDateTime expectedConsultTime) { this.expectedConsultTime = expectedConsultTime; }
 }

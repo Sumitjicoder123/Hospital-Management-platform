@@ -46,6 +46,7 @@ public class AuthDTOs {
         private Role role = Role.PATIENT;
         private Long hospitalId;
         private Long doctorId; // optional: links a DOCTOR-role registration to an existing Doctor record
+        private Long departmentId;
 
         public RegisterRequest() {}
 
@@ -69,6 +70,38 @@ public class AuthDTOs {
 
         public Long getDoctorId() { return doctorId; }
         public void setDoctorId(Long doctorId) { this.doctorId = doctorId; }
+
+        public Long getDepartmentId() { return departmentId; }
+        public void setDepartmentId(Long departmentId) { this.departmentId = departmentId; }
+    }
+
+    public static class CompleteProfileRequest {
+        @NotBlank(message = "Name is required")
+        private String name;
+
+        @NotBlank(message = "Phone number is required")
+        @Pattern(regexp = "^\\d{10}$", message = "Phone number must be exactly 10 digits")
+        private String phone;
+
+        @NotBlank(message = "Gender is required")
+        private String gender;
+
+        @NotBlank(message = "Address is required")
+        private String address;
+
+        public CompleteProfileRequest() {}
+
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+
+        public String getPhone() { return phone; }
+        public void setPhone(String phone) { this.phone = phone; }
+
+        public String getGender() { return gender; }
+        public void setGender(String gender) { this.gender = gender; }
+
+        public String getAddress() { return address; }
+        public void setAddress(String address) { this.address = address; }
     }
 
     public static class AuthResponse {
@@ -80,9 +113,11 @@ public class AuthDTOs {
         private String role;
         private Long hospitalId;
         private Long doctorId;
+        private boolean profileCompleted;
+        private String profilePicture;
 
         public AuthResponse() {}
-        public AuthResponse(String token, Long userId, String name, String email, String phone, String role, Long hospitalId, Long doctorId) {
+        public AuthResponse(String token, Long userId, String name, String email, String phone, String role, Long hospitalId, Long doctorId, boolean profileCompleted, String profilePicture) {
             this.token = token;
             this.userId = userId;
             this.name = name;
@@ -91,6 +126,8 @@ public class AuthDTOs {
             this.role = role;
             this.hospitalId = hospitalId;
             this.doctorId = doctorId;
+            this.profileCompleted = profileCompleted;
+            this.profilePicture = profilePicture;
         }
 
         public String getToken() { return token; }
@@ -101,5 +138,7 @@ public class AuthDTOs {
         public String getRole() { return role; }
         public Long getHospitalId() { return hospitalId; }
         public Long getDoctorId() { return doctorId; }
+        public boolean isProfileCompleted() { return profileCompleted; }
+        public String getProfilePicture() { return profilePicture; }
     }
 }

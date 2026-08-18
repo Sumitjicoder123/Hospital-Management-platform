@@ -51,6 +51,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/medical-records/**").permitAll()
                 .requestMatchers("/api/patients/**").permitAll()
                 .requestMatchers("/api/whatsapp/**").permitAll()
+                .requestMatchers("/api/admin/**").permitAll()
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()
                 .anyRequest().authenticated()

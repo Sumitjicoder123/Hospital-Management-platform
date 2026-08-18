@@ -26,7 +26,7 @@ public class Doctor {
     @Enumerated(EnumType.STRING)
     private DoctorStatus status = DoctorStatus.AVAILABLE;
 
-    private Integer consultationAvgTimeMinutes = 6;
+    private Integer consultationAvgTimeMinutes = 15;
 
     public enum DoctorStatus {
         AVAILABLE, ON_LEAVE, BUSY

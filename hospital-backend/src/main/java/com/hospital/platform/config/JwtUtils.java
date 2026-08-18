@@ -35,12 +35,17 @@ public class JwtUtils {
     }
 
     public String getEmailFromToken(String token) {
-        return Jwts.parser()
+        Claims claims = Jwts.parser()
                 .verifyWith(getSigningKey())
                 .build()
                 .parseSignedClaims(token)
-                .getPayload()
-                .getSubject();
+                .getPayload();
+        
+        String email = claims.get("email", String.class);
+        if (email == null) {
+            email = claims.getSubject();
+        }
+        return email;
     }
 
     public boolean validateToken(String authToken) {

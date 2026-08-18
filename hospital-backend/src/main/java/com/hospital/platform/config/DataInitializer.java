@@ -39,6 +39,15 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) throws Exception {
+        // Fix existing users that may have profileCompleted = false
+        List<User> existingUsers = userRepository.findAll();
+        for (User u : existingUsers) {
+            if (u.getRole() != Role.PATIENT && !u.isProfileCompleted()) {
+                u.setProfileCompleted(true);
+                userRepository.save(u);
+            }
+        }
+
         if (hospitalRepository.count() > 0) {
             System.out.println("Database already seeded — skipping initialization.");
             return;

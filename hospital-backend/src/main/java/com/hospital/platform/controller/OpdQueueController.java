@@ -26,6 +26,24 @@ public class OpdQueueController {
         return ResponseEntity.ok(queueService.bookAppointmentAndGenerateToken(request));
     }
 
+    @PostMapping("/appointments/schedule")
+    public ResponseEntity<com.hospital.platform.entity.Appointment> scheduleAppointment(@RequestBody ScheduledAppointmentRequest request) {
+        return ResponseEntity.ok(queueService.scheduleAppointment(request));
+    }
+
+    @PostMapping("/appointments/{id}/check-in")
+    public ResponseEntity<QueueEntry> checkInScheduledAppointment(@PathVariable Long id) {
+        return ResponseEntity.ok(queueService.checkInScheduledAppointment(id));
+    }
+
+    @GetMapping("/appointments/patient")
+    public ResponseEntity<List<com.hospital.platform.entity.Appointment>> getPatientAppointments(@RequestParam String phone, @RequestParam(required = false) String name) {
+        if (name != null && !name.isBlank()) {
+            return ResponseEntity.ok(queueService.getPatientAppointmentsByPhoneAndName(phone, name));
+        }
+        return ResponseEntity.ok(queueService.getPatientAppointments(phone));
+    }
+
     @GetMapping("/queues/doctor/{doctorId}")
     public ResponseEntity<List<QueueEntry>> getDoctorQueue(@PathVariable Long doctorId) {
         return ResponseEntity.ok(queueService.getQueueForDoctor(doctorId));
@@ -42,7 +60,10 @@ public class OpdQueueController {
     }
 
     @GetMapping("/queues/patient")
-    public ResponseEntity<List<QueueEntry>> getPatientQueue(@RequestParam String phone) {
+    public ResponseEntity<List<QueueEntry>> getPatientQueue(@RequestParam String phone, @RequestParam(required = false) String name) {
+        if (name != null && !name.isBlank()) {
+            return ResponseEntity.ok(queueService.getQueueByPatientPhoneAndName(phone, name));
+        }
         return ResponseEntity.ok(queueService.getQueueByPatientPhone(phone));
     }
 

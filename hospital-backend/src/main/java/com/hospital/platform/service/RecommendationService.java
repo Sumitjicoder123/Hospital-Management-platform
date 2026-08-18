@@ -24,7 +24,7 @@ public class RecommendationService {
     }
 
     public List<HospitalMatchScoreDTO> findAndRankHospitals(Long sourceHospitalId, Ward.BedType requiredBedType) {
-        Hospital sourceHospital = hospitalRepository.findById(sourceHospitalId).orElse(null);
+        Hospital sourceHospital = sourceHospitalId != null ? hospitalRepository.findById(sourceHospitalId).orElse(null) : null;
         double sourceLat = sourceHospital != null ? sourceHospital.getLatitude() : 28.6139;
         double sourceLng = sourceHospital != null ? sourceHospital.getLongitude() : 77.2090;
 

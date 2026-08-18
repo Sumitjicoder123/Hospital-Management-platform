@@ -7,31 +7,89 @@
       <p class="brand-desc">Hospital Resource &amp; Patient Flow Coordination</p>
     </div>
 
-    <div class="tab-row">
-      <button [class.active]="activeTab === 'login'" (click)="activeTab = 'login'; error = null">Sign In</button>
-      <button [class.active]="activeTab === 'register'" (click)="activeTab = 'register'; error = null">Register</button>
-    </div>
+    @if (!needsPhone) {
+      <div class="tab-row">
+        <button [class.active]="activeTab === 'login'" (click)="activeTab = 'login'; error = null">Sign In</button>
+        <button [class.active]="activeTab === 'register'" (click)="activeTab = 'register'; error = null">Register</button>
+      </div>
+    }
 
     @if (error) {
       <div class="error-banner">{{ error }}</div>
     }
 
-    <!-- LOGIN FORM -->
-    @if (activeTab === 'login') {
-      <form (ngSubmit)="onLogin()" class="auth-form">
+    <!-- PROFILE COMPLETION FORM -->
+    @if (needsPhone) {
+      <div class="completion-banner">
+        <h3>Complete Your Profile</h3>
+        <p>Please provide a few details to complete your patient registration.</p>
+      </div>
+      <form (ngSubmit)="onSaveProfile()" class="auth-form">
         <div class="field">
-          <label for="login-email">Email Address</label>
-          <input id="login-email" type="email" [(ngModel)]="loginForm.email" name="email" placeholder="doctor.h1@citypulse.in" autocomplete="email">
+          <label for="reg-name">Full Name</label>
+          <input id="reg-name" type="text" [(ngModel)]="missingPhoneForm.name" name="name" placeholder="Rahul Sharma" autocomplete="name" required>
         </div>
         <div class="field">
-          <label for="login-password">Password</label>
+          <label for="reg-phone">Phone Number</label>
+          <input id="reg-phone" type="tel" maxlength="10" [(ngModel)]="missingPhoneForm.phone" name="phone" placeholder="9811122233" autocomplete="tel" required>
+        </div>
+        <div class="field">
+          <label for="reg-gender">Gender</label>
+          <select id="reg-gender" [(ngModel)]="missingPhoneForm.gender" name="gender" required style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--border-radius); background: var(--bg-primary); color: var(--text-primary); font-size: 1rem;">
+            <option value="" disabled selected>Select Gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="reg-address">Address</label>
+          <textarea id="reg-address" [(ngModel)]="missingPhoneForm.address" name="address" placeholder="123 Example Street, City" required style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--border-radius); background: var(--bg-primary); color: var(--text-primary); font-size: 1rem; resize: vertical; min-height: 80px;"></textarea>
+        </div>
+        <button type="submit" class="btn-submit" [disabled]="loading">
+          {{ loading ? 'Saving...' : 'Save & Continue' }}
+        </button>
+        <div style="text-align: center; margin-top: 1rem;">
+          <a href="javascript:void(0)" (click)="onSignOut()" style="color: var(--text-secondary); text-decoration: underline; font-size: 0.9rem;">Cancel & Sign Out</a>
+        </div>
+      </form>
+    }
+
+    <!-- LOGIN FORM -->
+    @if (activeTab === 'login' && !needsPhone) {
+      <div class="oauth-section">
+        <button type="button" class="btn-google" (click)="onGoogleSignIn()">
+          <img src="https://www.google.com/favicon.ico" alt="Google" class="google-icon">
+          Sign In with Google
+        </button>
+        <div class="divider">
+          <span>OR</span>
+        </div>
+      </div>
+      <form (ngSubmit)="onEmailSignIn()" class="auth-form">
+        <div class="field">
+          <label for="login-email">Email Address</label>
+          <input id="login-email" type="email" [(ngModel)]="loginForm.email" name="email" placeholder="patient@example.com" autocomplete="email">
+        </div>
+        <div class="field">
+          <label for="login-password" style="display: flex; justify-content: space-between;">
+            <span>Password</span>
+            <a href="javascript:void(0)" (click)="onForgotPassword()" style="color: var(--accent-blue); text-decoration: none; font-size: 0.75rem; text-transform: none; letter-spacing: normal;">Forgot Password?</a>
+          </label>
           <div class="input-with-icon">
             <input id="login-password" [type]="showLoginPassword ? 'text' : 'password'" [(ngModel)]="loginForm.password" name="password" placeholder="Enter your password" autocomplete="current-password">
-            <button type="button" class="btn-eye" (click)="showLoginPassword = !showLoginPassword">
-              {{ showLoginPassword ? '🙈' : '👁️' }}
+            <button type="button" class="btn-eye" (click)="showLoginPassword = !showLoginPassword" title="Toggle Password Visibility" style="font-size: 0.8rem; font-weight: 500; padding: 0 8px; border-radius: 4px; background: transparent; border: none; color: var(--accent-blue); cursor: pointer;">
+              {{ showLoginPassword ? 'Hide' : 'Show' }}
             </button>
           </div>
         </div>
+        
+        @if (resetEmailSent) {
+          <div style="background: rgba(5, 150, 105, 0.1); border: 1px solid rgba(5, 150, 105, 0.25); color: var(--status-available); padding: 10px 14px; border-radius: 6px; font-size: 0.85rem;">
+            Password reset link sent to your email.
+          </div>
+        }
+
         <button type="submit" class="btn-submit" [disabled]="loading">
           {{ loading ? 'Signing in...' : 'Sign In' }}
         </button>
@@ -39,43 +97,47 @@
     }
 
     <!-- REGISTER FORM -->
-    @if (activeTab === 'register') {
-      <form (ngSubmit)="onRegister()" class="auth-form">
-        <div class="field">
-          <label for="reg-name">Full Name</label>
-          <input id="reg-name" type="text" [(ngModel)]="registerForm.name" name="name" placeholder="Rahul Sharma" autocomplete="name">
+    @if (activeTab === 'register' && !needsPhone) {
+      <div class="oauth-section" style="margin-top: 1rem;">
+        <p class="register-note" style="text-align: center; margin-bottom: 1.5rem;">Register with Google, or create an account with your email.</p>
+        <button type="button" class="btn-google" (click)="onGoogleSignIn()">
+          <img src="https://www.google.com/favicon.ico" alt="Google" class="google-icon">
+          Continue with Google
+        </button>
+        <div class="divider">
+          <span>OR</span>
         </div>
+      </div>
+      
+      <form (ngSubmit)="onEmailSignUp()" class="auth-form">
         <div class="field">
-          <label for="reg-email">Email Address</label>
-          <input id="reg-email" type="email" [(ngModel)]="registerForm.email" name="email" placeholder="rahul@example.com" autocomplete="email">
+          <label for="reg-email-input">Email Address</label>
+          <input id="reg-email-input" type="email" [(ngModel)]="registerForm.email" name="regEmail" placeholder="patient@example.com" autocomplete="email" required>
         </div>
-        <div class="field">
-          <label for="reg-phone">Phone Number</label>
-          <input id="reg-phone" type="tel" maxlength="10" [(ngModel)]="registerForm.phone" name="phone" placeholder="9811122233" autocomplete="tel">
-        </div>
+        
         <div class="field">
           <label for="reg-password">Password</label>
           <div class="input-with-icon">
-            <input id="reg-password" [type]="showRegisterPassword ? 'text' : 'password'" [(ngModel)]="registerForm.password" name="password" placeholder="Min 8 chars, 1 letter, 1 number" autocomplete="new-password">
-            <button type="button" class="btn-eye" (click)="showRegisterPassword = !showRegisterPassword">
-              {{ showRegisterPassword ? '🙈' : '👁️' }}
+            <input id="reg-password" [type]="showRegisterPassword ? 'text' : 'password'" [(ngModel)]="registerForm.password" name="regPassword" placeholder="Minimum 6 characters" required>
+            <button type="button" class="btn-eye" (click)="showRegisterPassword = !showRegisterPassword" title="Toggle Password Visibility" style="font-size: 0.8rem; font-weight: 500; padding: 0 8px; border-radius: 4px; background: transparent; border: none; color: var(--accent-blue); cursor: pointer;">
+              {{ showRegisterPassword ? 'Hide' : 'Show' }}
             </button>
           </div>
         </div>
+
         <div class="field">
-          <label for="reg-confirm">Confirm Password</label>
-          <div class="input-with-icon">
-            <input id="reg-confirm" [type]="showConfirmPassword ? 'text' : 'password'" [(ngModel)]="registerForm.confirmPassword" name="confirmPassword" placeholder="Re-enter password" autocomplete="new-password">
-            <button type="button" class="btn-eye" (click)="showConfirmPassword = !showConfirmPassword">
-              {{ showConfirmPassword ? '🙈' : '👁️' }}
-            </button>
-          </div>
+          <label for="reg-confirm-password">Confirm Password</label>
+          <input id="reg-confirm-password" type="password" [(ngModel)]="registerForm.confirmPassword" name="regConfirmPassword" placeholder="Re-enter password" required>
         </div>
-        <p class="register-note">You will be registered as a Patient. Doctor and admin accounts are pre-provisioned.</p>
+
         <button type="submit" class="btn-submit" [disabled]="loading">
-          {{ loading ? 'Creating account...' : 'Create Patient Account' }}
+          {{ loading ? 'Creating Account...' : 'Create Account' }}
         </button>
       </form>
+
+      <p class="register-note" style="text-align: center; margin-top: 1rem; color: var(--text-secondary);">
+        Doctor and admin accounts are pre-provisioned by City Care Pulse and can sign in directly on the Sign In tab.
+      </p>
     }
 
   </div>
