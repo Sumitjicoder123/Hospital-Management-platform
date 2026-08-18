@@ -23,6 +23,9 @@ public class MedicalRecord {
     @Column(nullable = false)
     private Long hospitalId;
 
+    @org.hibernate.annotations.Formula("(SELECT h.name FROM hospitals h WHERE h.id = hospital_id)")
+    private String hospitalName;
+
     private Long doctorId;
     private String doctorName;
 
@@ -78,6 +81,9 @@ public class MedicalRecord {
 
     public Long getHospitalId() { return hospitalId; }
     public void setHospitalId(Long hospitalId) { this.hospitalId = hospitalId; }
+
+    public String getHospitalName() { return hospitalName; }
+    public void setHospitalName(String hospitalName) { this.hospitalName = hospitalName; }
 
     public Long getDoctorId() { return doctorId; }
     public void setDoctorId(Long doctorId) { this.doctorId = doctorId; }

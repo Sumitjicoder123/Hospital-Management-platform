@@ -300,8 +300,9 @@
                     <span style="font-weight: 600; color: #0f172a;">Visit Date:</span> {{ rec.visitDate | date:'mediumDate' }} 
                     <span style="margin-left: 16px; font-weight: 600; color: #0f172a;">Time:</span> {{ rec.visitDate | date:'shortTime' }}
                   </div>
-                  <div>
-                    <span style="font-weight: 600; color: #0f172a;">Doctor ID:</span> {{ rec.doctorId }}
+                  <div style="text-align: right;">
+                    <div style="font-weight: 600; color: #0f172a;">{{ rec.doctorName || 'Doctor ID: ' + rec.doctorId }}</div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary);">{{ rec.hospitalName || 'Hospital ID: ' + rec.hospitalId }}</div>
                   </div>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.85rem; color: var(--text-secondary);">

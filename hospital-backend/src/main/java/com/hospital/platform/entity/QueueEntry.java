@@ -20,7 +20,7 @@ public class QueueEntry {
     @org.hibernate.annotations.Formula("(SELECT h.name FROM hospitals h WHERE h.id = hospital_id)")
     private String hospitalName;
 
-    @org.hibernate.annotations.Formula("(SELECT u.name FROM users u JOIN doctors d ON u.id = d.user_id WHERE d.id = doctor_id)")
+    @org.hibernate.annotations.Formula("(SELECT d.name FROM doctors d WHERE d.id = doctor_id)")
     private String doctorName;
 
     @Column(nullable = false)
