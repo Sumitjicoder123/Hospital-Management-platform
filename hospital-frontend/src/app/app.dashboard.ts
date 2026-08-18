@@ -194,17 +194,17 @@ export class DashboardComponent implements OnInit {
   }
 
   loadPatientData(): void {
-    if (this.currentUser && this.currentUser.phone && this.currentUser.name) {
-      this.apiService.getPatientQueueByPhoneAndName(this.currentUser.phone, this.currentUser.name).subscribe(data => {
+    if (this.currentUser && this.currentUser.phone) {
+      this.apiService.getPatientQueue(this.currentUser.phone).subscribe(data => {
         this.patientTokens = data.sort((a, b) => b.id - a.id);
         this.cdr.markForCheck();
       });
-      this.apiService.getPatientAppointmentsByPhoneAndName(this.currentUser.phone, this.currentUser.name).subscribe(data => {
+      this.apiService.getPatientAppointments(this.currentUser.phone).subscribe(data => {
         this.patientScheduledAppointments = data.sort((a, b) => new Date(a.appointmentTime).getTime() - new Date(b.appointmentTime).getTime());
         // 2. Fetch Medical History (Consultations)
-        if (this.currentUser.phone && this.currentUser.name) {
-          this.apiService.getPatientHistoryByPhoneAndName(this.currentUser.phone, this.currentUser.name).subscribe(data => {
-            this.patientHistoryRecords = data.sort((a, b) => new Date(b.visitDate).getTime() - new Date(a.visitDate).getTime());
+        if (this.currentUser.phone) {
+          this.apiService.getPatientHistoryByPhone(this.currentUser.phone).subscribe(historyData => {
+            this.patientHistoryRecords = historyData.sort((a, b) => new Date(b.visitDate).getTime() - new Date(a.visitDate).getTime());
           });
         }
         this.cdr.markForCheck();

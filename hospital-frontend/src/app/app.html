@@ -231,8 +231,9 @@
                       <span class="wait-unit">Scheduled Slot</span>
                     </div>
                     <dl class="token-details">
-                      <dt>Doctor</dt><dd>ID: {{ appt.doctorId }}</dd>
-                      <dt>Hospital</dt><dd>ID: {{ appt.hospitalId }}</dd>
+                      <dt>Patient</dt><dd>{{ appt.patientName }}</dd>
+                      <dt>Doctor</dt><dd>{{ appt.doctorName || 'ID: ' + appt.doctorId }}</dd>
+                      <dt>Hospital</dt><dd>{{ appt.hospitalName || 'ID: ' + appt.hospitalId }}</dd>
                     </dl>
                     <button class="btn-primary full-width" style="margin-top: 12px; font-size: 0.85rem;" (click)="checkInScheduled(appt.id)">Check In Now</button>
                   </div>
@@ -256,7 +257,8 @@
                   }
                   <dl class="token-details">
                     <dt>Patient</dt><dd>{{ token.patientName }}</dd>
-                    <dt>Hospital</dt><dd>ID: {{ token.hospitalId }}</dd>
+                    <dt>Doctor</dt><dd>{{ token.doctorName || 'ID: ' + token.doctorId }}</dd>
+                    <dt>Hospital</dt><dd>{{ token.hospitalName || 'ID: ' + token.hospitalId }}</dd>
                   </dl>
                 </div>
               }

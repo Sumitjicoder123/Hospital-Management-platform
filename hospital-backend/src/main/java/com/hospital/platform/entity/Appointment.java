@@ -15,6 +15,12 @@ public class Appointment {
     private String patientName;
     private String patientPhone;
 
+    @org.hibernate.annotations.Formula("(SELECT h.name FROM hospitals h WHERE h.id = hospital_id)")
+    private String hospitalName;
+
+    @org.hibernate.annotations.Formula("(SELECT u.name FROM users u JOIN doctors d ON u.id = d.user_id WHERE d.id = doctor_id)")
+    private String doctorName;
+
     @Column(nullable = false)
     private Long doctorId;
 
@@ -65,6 +71,12 @@ public class Appointment {
 
     public String getPatientPhone() { return patientPhone; }
     public void setPatientPhone(String patientPhone) { this.patientPhone = patientPhone; }
+
+    public String getHospitalName() { return hospitalName; }
+    public void setHospitalName(String hospitalName) { this.hospitalName = hospitalName; }
+
+    public String getDoctorName() { return doctorName; }
+    public void setDoctorName(String doctorName) { this.doctorName = doctorName; }
 
     public Long getDoctorId() { return doctorId; }
     public void setDoctorId(Long doctorId) { this.doctorId = doctorId; }
