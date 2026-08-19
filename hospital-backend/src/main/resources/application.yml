@@ -23,7 +23,7 @@ spring:
         format_sql: true
 
 jwt:
-  secret: ${JWT_SECRET:YOUR_SUPABASE_JWT_SECRET}
+  secret: ${JWT_SECRET:this_is_a_very_secure_and_long_jwt_secret_for_local_dev}
   expirationMs: 86400000
 
 # WhatsApp Cloud API (Meta) - OPD booking via WhatsApp.
