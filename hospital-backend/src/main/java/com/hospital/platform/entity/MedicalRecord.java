@@ -27,6 +27,8 @@ public class MedicalRecord {
     private String hospitalName;
 
     private Long doctorId;
+
+    @org.hibernate.annotations.Formula("(SELECT d.name FROM doctors d WHERE d.id = doctor_id)")
     private String doctorName;
 
     private Long departmentId;
@@ -62,7 +64,6 @@ public class MedicalRecord {
         this.patientPhone = patientPhone;
         this.hospitalId = hospitalId;
         this.doctorId = doctorId;
-        this.doctorName = doctorName;
         this.departmentId = departmentId;
         this.appointmentId = appointmentId;
     }
